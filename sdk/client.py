@@ -202,7 +202,7 @@ class Client():
         ]
 
         return self._submit(transactions)
-    
+
     def claim_rewards(self, amount: int):
         sp = self.get_suggested_params()
         current_period_index = self.get_global(CURRENT_PERIOD_INDEX_KEY)

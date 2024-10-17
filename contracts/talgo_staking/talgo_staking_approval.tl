@@ -72,6 +72,7 @@ func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: i
         ConfigAssetMetadataHash: metadata_hash
 		ConfigAssetClawback: Global.CurrentApplicationAddress
         ConfigAssetFreeze: Global.CurrentApplicationAddress
+        ConfigAssetDefaultFrozen: 1
         Fee: 0
     end
 
@@ -114,6 +115,7 @@ func set_tiny_power_threshold(threshold: int)
 
     log(ARC28Event("set_tiny_power_threshold(uint64)", itob(threshold)))
 end
+
 
 @public()
 func update_state(period_index: int):
@@ -192,9 +194,10 @@ func increase_stake(amount: int):
     update_state(app_global_get(CURRENT_PERIOD_INDEX_KEY))
     update_user_state(Txn.Sender)
 
-    check_received_transfer(Txn.GroupIndex - 1, app_global_get(TALGO_ASSET_ID_KEY), Global.CurrentApplicationAddress, amount)
+    check_received_talgo(Txn.GroupIndex - 1, amount)
     user_state.staked_amount = user_state.staked_amount + amount
 
+    send_stalgo(amount, Txn.Sender)
     transfer(app_global_get(STALGO_ASSET_ID_KEY), amount, Global.CurrentApplicationAddress, Txn.Sender)
 
     if !user_state.staked_amount:
@@ -231,9 +234,9 @@ func decrease_stake(amount: int):
     assert(amount <= user_state.staked_amount)
 
     user_state.staked_amount = user_state.staked_amount - amount
-    clawback(app_global_get(STALGO_ASSET_ID_KEY), amount, Txn.Sender)
+    clawback_stalgo(amount, Txn.Sender)
 
-    transfer(app_global_get(TALGO_ASSET_ID_KEY), amount, Global.CurrentApplicationAddress, Txn.Sender)
+    send_talgo(amount, Txn.Sender)
 
     if !user_state.staked_amount:
         total_staker_count = app_global_get(TOTAL_STAKER_COUNT_KEY)
@@ -262,7 +265,7 @@ func claim_rewards():
 
     int amount = user_state.accumulated_rewards
     if amount:
-        transfer_rewards_to_user(amount, Txn.Sender)
+        send_rewards(amount, Txn.Sender)
         user_state.accumulated_rewards = 0
     end
 
@@ -274,72 +277,67 @@ func claim_rewards():
 end
 
 
-func transfer(asset_id: int, amount: int, sender: bytes, receiver: bytes):
-    if !asset_id:
-        inner_txn:
-            TypeEnum: Pay
-            Sender: sender
-            Receiver: receiver
-            Amount: amount
-            Fee: 0
-        end
-    else:
-        inner_txn:
-            TypeEnum: Axfer
-            Sender: sender
-            AssetReceiver: receiver
-            AssetAmount: amount
-            XferAsset: asset_id
-            Fee: 0
-        end
+func send_stalgo(amount: int, receiver: bytes[32]):
+    inner_txn:
+        TypeEnum: Axfer
+        Sender: Global.CurrentApplicationAddress
+        AssetReceiver: receiver
+        AssetAmount: amount
+        XferAsset: app_global_get(STALGO_ASSET_ID_KEY)
+        Fee: 0
     end
+
     return
 end
 
 
-func transfer_rewards_to_user(amount: int, user_address: bytes[32]):
-	transfer(app_global_get(TINY_ASSET_ID_KEY), amount, Global.CurrentApplicationAddress, user_address)
-	return
+func send_talgo(amount: int, receiver: bytes[32]):
+    inner_txn:
+        TypeEnum: Axfer
+        Sender: Global.CurrentApplicationAddress
+        AssetReceiver: receiver
+        AssetAmount: amount
+        XferAsset: app_global_get(TALGO_ASSET_ID_KEY)
+        Fee: 0
+    end
+
+    return
 end
 
 
-func clawback(asset_id: int, amount: int, user: bytes):
+func send_rewards(amount: int, receiver: bytes[32]):
+    inner_txn:
+        TypeEnum: Axfer
+        Sender: Global.CurrentApplicationAddress
+        AssetReceiver: receiver
+        AssetAmount: amount
+        XferAsset: app_global_get(TINY_ASSET_ID_KEY)
+        Fee: 0
+    end
+
+    return
+end
+
+
+func clawback_stalgo(amount: int, user: bytes[32]):
     inner_txn:
         TypeEnum: Axfer
 		Sender: Global.CurrentApplicationAddress
         AssetSender: user
         AssetReceiver: Global.CurrentApplicationAddress
         AssetAmount: amount
-        XferAsset: asset_id
+        XferAsset: app_global_get(STALGO_ASSET_ID_KEY)
         Fee: 0
     end
     return
 end
 
 
-func check_received_transfer(txn_index: int, asset_id: int, receiver: bytes, amount: int):
-    if !asset_id:
-        assert(Gtxn[txn_index].TypeEnum == Pay)
-        assert(Gtxn[txn_index].Receiver == receiver)
-        assert(Gtxn[txn_index].Amount == amount)
-    else:
-        assert(Gtxn[txn_index].TypeEnum == Axfer)
-        assert(Gtxn[txn_index].AssetReceiver == receiver)
-        assert(Gtxn[txn_index].AssetAmount == amount)
-        assert(Gtxn[txn_index].XferAsset == asset_id)
-    end
+check_received_talgo(txn_index: int, amount: int):
+    assert(Gtxn[txn_index].TypeEnum == Axfer)
+    assert(Gtxn[txn_index].AssetReceiver == Global.CurrentApplicationAddress)
+    assert(Gtxn[txn_index].AssetAmount == amount)
+    assert(Gtxn[txn_index].XferAsset == app_global_get(TALGO_ASSET_ID_KEY))
+
     return
-end
-
-
-func get_account_voting_power(address: bytes[32]) int:
-    inner_txn:
-        TypeEnum: Appl
-        ApplicationID: app_global_get(VAULT_APP_ID_KEY)
-        ApplicationArgs[0]: "get_tiny_power_of"
-        ApplicationArgs[1]: address
-        Fee: 0
-    end
-    int voting_power = extract_uint64(Itxn.LastLog, 4)
-    return voting_power
 end
