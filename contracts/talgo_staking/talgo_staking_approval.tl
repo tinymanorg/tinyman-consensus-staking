@@ -18,12 +18,14 @@ end
 
 # Global State
 
+const bytes VAULT_APP_ID_KEY = "vault_app_id"
 const bytes TINY_ASSET_ID_KEY = "tiny_asset_id"
 const bytes TALGO_ASSET_ID_KEY = "talgo_asset_id"
 const bytes STALGO_ASSET_ID_KEY = "stalgo_asset_id"
 const bytes PERIOD_COUNT_KEY = "period_count"
 const bytes CURRENT_PERIOD_INDEX_KEY = "current_period_index"
 
+const bytes TINY_POWER_THRESHOLD_KEY = "tiny_power_threshold"
 const bytes LAST_UPDATE_TIMESTAMP_KEY = "last_update_timestamp"
 const bytes ACCUMULATED_REWARDS_PER_UNIT = "accumulated_rewards_per_unit"
 const bytes CURRENT_REWARD_RATE_PER_TIME_KEY = "current_reward_rate_per_time"
@@ -40,6 +42,7 @@ const int MAX_UINT64 = 18446744073709551615
 router:
     create_application
     create_reward_period
+    set_tiny_power_threshold
     update_state
     increase_stake
     decrease_stake
@@ -48,10 +51,12 @@ end
 
 
 @public(OnCompletion=CreateApplication)
-func create_application(talgo_asset_id: int, tiny_asset_id: int, manager_address: bytes[32]):
+func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: int, manager_address: bytes[32]):
     app_global_put(TALGO_ASSET_ID_KEY, talgo_asset_id)
 	app_global_put(TINY_ASSET_ID_KEY, tiny_asset_id)
+    app_global_put(VAULT_APP_ID_KEY, vault_app_id)
 	app_global_put(MANAGER_KEY, manager_address)
+    app_global_put(TINY_POWER_THRESHOLD_KEY, 1000)
 
     bytes metadata_hash
     _, metadata_hash = asset_params_get(AssetMetadataHash, tiny_asset_id)
@@ -101,6 +106,14 @@ func create_reward_period(total_reward_amount: int, start_timestamp: int, end_ti
     return
 end
 
+
+func set_tiny_power_threshold(threshold: int)
+    assert(Txn.Sender == app_global_get(MANAGER_KEY))
+
+    app_global_put(TINY_POWER_THRESHOLD_KEY, threshold)
+
+    log(ARC28Event("set_tiny_power_threshold(uint64)", itob(threshold)))
+end
 
 @public()
 func update_state(period_index: int):
@@ -172,6 +185,7 @@ end
 @public()
 func increase_stake(amount: int):
     int total_staker_count
+    int current_tiny_power
 
     box<UserState> user_state = OpenOrCreateBox(Txn.Sender)
 
@@ -184,6 +198,9 @@ func increase_stake(amount: int):
     transfer(app_global_get(STALGO_ASSET_ID_KEY), amount, Global.CurrentApplicationAddress, Txn.Sender)
 
     if !user_state.staked_amount:
+        current_tiny_power = get_account_voting_power(Txn.Sender)
+        assert(tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))
+
         total_staker_count = app_global_get(TOTAL_STAKER_COUNT_KEY)
         total_staker_count = total_staker_count + 1
         app_global_put(TOTAL_STAKER_COUNT_KEY, total_staker_count)
@@ -312,4 +329,17 @@ func check_received_transfer(txn_index: int, asset_id: int, receiver: bytes, amo
         assert(Gtxn[txn_index].XferAsset == asset_id)
     end
     return
+end
+
+
+func get_account_voting_power(address: bytes[32]) int:
+    inner_txn:
+        TypeEnum: Appl
+        ApplicationID: app_global_get(VAULT_APP_ID_KEY)
+        ApplicationArgs[0]: "get_tiny_power_of"
+        ApplicationArgs[1]: address
+        Fee: 0
+    end
+    int voting_power = extract_uint64(Itxn.LastLog, 4)
+    return voting_power
 end
