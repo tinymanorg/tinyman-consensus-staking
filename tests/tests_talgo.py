@@ -1,3 +1,4 @@
+from base64 import b64decode
 from datetime import datetime
 import time
 import uuid
@@ -66,6 +67,15 @@ class TestSetup(BaseTestCase):
             self.ledger.global_states[app_id],
             {
                 b'manager': decode_address(account_address),
+                b'node_manager_0': decode_address(account_address),
+                b'node_manager_1': decode_address(account_address),
+                b'node_manager_2': decode_address(account_address),
+                b'node_manager_3': decode_address(account_address),
+                b'node_manager_4': decode_address(account_address),
+                b'fee_collector': decode_address(account_address),
+                b'stake_manager': decode_address(account_address),
+                b'protocol_fee': 10,
+                b'fee_balance': 0,
             }
         )
 
@@ -118,3 +128,22 @@ class TestSetup(BaseTestCase):
             print("algo_balance", self.t_algo_client.get_global(b"algo_balance"))
             print("total_rewards", self.t_algo_client.get_global(b"total_rewards"))
             print()
+
+    def test_go_online(self):
+        self.ledger.set_global_state(self.app_id, {"node_manager_1": decode_address(self.user_address)})
+        self.t_algo_client.init()
+        node_index = 1
+        # nonsense sample values from the Algorand docs
+        vote_pk = b64decode('G/lqTV6MKspW6J8wH2d8ZliZ5XZVZsruqSBJMwLwlmo=')
+        selection_pk = b64decode('LrpLhvzr+QpN/bivh6IPpOaKGbGzTTB5lJtVfixmmgk=')
+        state_proof_pk = b64decode('RpUpNWfZMjZ1zOOjv3MF2tjO714jsBt0GKnNsw0ihJ4HSZwci+d9zvUi3i67LwFUJgjQ5Dz4zZgHgGduElnmSA==')
+        vote_first = 0
+        vote_last = 100000
+        vote_key_dilution = int(100000 ** 0.5)
+        fee = 0
+        self.t_algo_client.go_online(node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee)
+        a = encode_address(self.t_algo_client.get_global(b"account_1"))
+        print(self.ledger.get_raw_account(a))
+
+        self.t_algo_client.go_offline(node_index)
+        print(self.ledger.get_raw_account(a))

@@ -102,3 +102,45 @@ class TAlgoClient(BaseClient):
             ),
         ]
         return self._submit(transactions, additional_fees=1)
+
+    def go_online(self, node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["go_online", node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee],
+                accounts=[
+                    encode_address(self.get_global(b"account_1")),
+                    encode_address(self.get_global(b"account_2")),
+                    encode_address(self.get_global(b"account_3")),
+                    encode_address(self.get_global(b"account_4")),
+                ],
+                foreign_assets=[
+                ]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=1)
+    
+    def go_offline(self, node_index):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["go_offline", node_index],
+                accounts=[
+                    encode_address(self.get_global(b"account_1")),
+                    encode_address(self.get_global(b"account_2")),
+                    encode_address(self.get_global(b"account_3")),
+                    encode_address(self.get_global(b"account_4")),
+                ],
+                foreign_assets=[
+                ]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=1)

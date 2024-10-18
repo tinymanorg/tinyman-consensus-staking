@@ -56,7 +56,9 @@ class BaseTestCase(unittest.TestCase):
         self.ledger.set_global_state(
             app_id,
             {
-
+                b"manager": decode_address(app_creator_address),
+                b"node_manager_1": decode_address(app_creator_address),
+                b"protocol_fee": 10,
             }
         )
 
