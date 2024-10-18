@@ -31,7 +31,7 @@ class TestSetup(BaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.ledger.set_account_balance(self.user_address, 1000_000_000)
+        self.ledger.set_account_balance(self.user_address, int(1e16))
 
     def dummy_block(self, timestamp=None):
         if timestamp is None:
@@ -100,23 +100,26 @@ class TestSetup(BaseTestCase):
     def test_mint(self):
         self.t_algo_client.init()
         for x in range(5):
-            self.t_algo_client.mint(2_000_000)
+            # self.t_algo_client.mint(2_000_000)
+            self.t_algo_client.mint(int(10e12))
             print_logs(self.ledger.last_block[b'txns'][2][b'dt'][b'lg'])
             print("rate", self.t_algo_client.get_global(b"rate"))
             print("minted_talgo", self.t_algo_client.get_global(b"minted_talgo"))
             print("algo_balance", self.t_algo_client.get_global(b"algo_balance"))
             print("total_rewards", self.t_algo_client.get_global(b"total_rewards"))
+            print("protocol_talgo", self.t_algo_client.get_global(b"protocol_talgo"))
             print()
 
         for x in range(5):
-            self.ledger.add(self.application_address, 100_000)
+            self.ledger.add(self.application_address, 1000)
             self.t_algo_client.sync()
             print("rate", self.t_algo_client.get_global(b"rate"))
             print("minted_talgo", self.t_algo_client.get_global(b"minted_talgo"))
             print("algo_balance", self.t_algo_client.get_global(b"algo_balance"))
             print("total_rewards", self.t_algo_client.get_global(b"total_rewards"))
+            print("protocol_talgo", self.t_algo_client.get_global(b"protocol_talgo"))
             asset_id = self.t_algo_client.get_global(b"talgo_asset_id")
-            print(self.ledger.get_account_balance(self.t_algo_client.user_address, asset_id)[0])
+            print("user talgo", self.ledger.get_account_balance(self.t_algo_client.user_address, asset_id)[0])
             print()
 
         for x in range(5):
@@ -127,6 +130,8 @@ class TestSetup(BaseTestCase):
             print("minted_talgo", self.t_algo_client.get_global(b"minted_talgo"))
             print("algo_balance", self.t_algo_client.get_global(b"algo_balance"))
             print("total_rewards", self.t_algo_client.get_global(b"total_rewards"))
+            print("protocol_talgo", self.t_algo_client.get_global(b"protocol_talgo"))
+            print("user talgo", self.ledger.get_account_balance(self.t_algo_client.user_address, asset_id)[0])
             print()
 
     def test_go_online(self):

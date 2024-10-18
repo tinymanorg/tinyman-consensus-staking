@@ -19,6 +19,7 @@ const bytes AUX_PROGRAM = "\n1\x18\x81\x00\x12D\xb1\x81\x01\xb2\x101\x00\xb2\x07
 
 router:
     create_application
+    update_application
     init
     mint
     burn
@@ -52,6 +53,14 @@ func create_application(manager_address: bytes[32]):
     app_global_put("fee_balance", 0)
 	# create_application(manager_address)
 	log(ARC28Event("create_application(address)", manager_address))
+    return
+end
+
+
+# TODO: This must be removed before Mainnet.
+@public(OnCompletion=UpdateApplication)
+func update_application():
+	assert(Txn.Sender == Global.CreatorAddress)
     return
 end
 
@@ -273,16 +282,23 @@ end
 
 func update_rewards_and_rate(delta: int):
 	int algo_balance = full_balance()
-    # TODO: change calculations to use wide math where necessary
 	int new_rewards = (algo_balance - delta) - app_global_get("algo_balance")
 	app_global_put("total_rewards", app_global_get("total_rewards") + new_rewards)
-	int protocol_rewards = ((new_rewards * 100) / app_global_get("protocol_fee"))
+	int protocol_rewards = (new_rewards * app_global_get("protocol_fee")) / 100
+    int protocol_talgo = app_global_get("protocol_talgo")
 	int new_protocol_talgo = calc_talgo(protocol_rewards) 
-    app_global_put("protocol_talgo", app_global_get("protocol_talgo") + new_protocol_talgo)
-    app_global_put("minted_talgo", app_global_get("minted_talgo") + new_protocol_talgo)
-    app_global_put("algo_balance", (algo_balance - delta))
-    if app_global_get("minted_talgo"):
-        app_global_put("rate", (app_global_get("algo_balance") * RATE_SCALER) / app_global_get("minted_talgo"))
+    protocol_talgo = protocol_talgo + new_protocol_talgo
+    int minted_talgo = app_global_get("minted_talgo") + new_protocol_talgo
+    algo_balance = algo_balance - delta
+    minted_talgo = minted_talgo + new_protocol_talgo
+    app_global_put("protocol_talgo", protocol_talgo)
+    app_global_put("minted_talgo", minted_talgo)
+    app_global_put("algo_balance", algo_balance)
+    if minted_talgo:
+        # int rate = (algo_balance * RATE_SCALER) / minted_talgo
+        # use wide math otherwise any algo_balance over approx 18M would cause an overflow
+        int rate = btoi((itob(algo_balance) b* itob(RATE_SCALER)) b/ itob(minted_talgo))
+        app_global_put("rate", rate)
     else:
         app_global_put("rate", 1 * RATE_SCALER)
     end
@@ -292,13 +308,15 @@ end
 
 
 func calc_talgo(algo_amount: int) int:
-	int talgo_amount = (algo_amount * RATE_SCALER) / app_global_get("rate")
+	# int talgo_amount = (algo_amount * RATE_SCALER) / app_global_get("rate")
+    int talgo_amount = btoi((itob(algo_amount) b* itob(RATE_SCALER)) b/ itob(app_global_get("rate")))
     return talgo_amount
 end
 
 
 func calc_algo(talgo_amount: int) int:
-	int algo_amount = (talgo_amount * app_global_get("rate")) / RATE_SCALER
+	# int algo_amount = (talgo_amount * app_global_get("rate")) / RATE_SCALER
+    int algo_amount = btoi((itob(talgo_amount) b* itob(app_global_get("rate"))) b/ itob(RATE_SCALER))
     return algo_amount
 end
 

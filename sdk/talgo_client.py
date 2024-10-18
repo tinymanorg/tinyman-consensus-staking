@@ -12,7 +12,7 @@ class TAlgoClient(BaseClient):
                 sender=self.user_address,
                 receiver=self.application_address,
                 sp=sp,
-                amt=10_000_000,
+                amt=2_000_000,
             ),
             transaction.ApplicationCallTxn(
                 sender=self.user_address,
