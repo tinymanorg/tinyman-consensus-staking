@@ -288,7 +288,7 @@ func update_rewards_and_rate(delta: int):
     int protocol_talgo = app_global_get("protocol_talgo")
 	int new_protocol_talgo = calc_talgo(protocol_rewards) 
     protocol_talgo = protocol_talgo + new_protocol_talgo
-    int minted_talgo = app_global_get("minted_talgo") + new_protocol_talgo
+    int minted_talgo = app_global_get("minted_talgo")
     algo_balance = algo_balance - delta
     minted_talgo = minted_talgo + new_protocol_talgo
     app_global_put("protocol_talgo", protocol_talgo)
