@@ -41,6 +41,7 @@ const int MAX_UINT64 = 18446744073709551615
 
 router:
     create_application
+    init
     update_application
     create_reward_period
     set_tiny_power_threshold
