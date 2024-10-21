@@ -41,12 +41,22 @@ const int MAX_UINT64 = 18446744073709551615
 
 router:
     create_application
+    update_application
     create_reward_period
     set_tiny_power_threshold
     update_state
     increase_stake
     decrease_stake
     claim_rewards
+end
+
+
+# TODO: This should be removed.
+@public(OnCompletion=UpdateApplication)
+func update_application():
+	bytes manager_address = app_global_get(MANAGER_KEY)
+	assert(Txn.Sender == manager_address)
+    return
 end
 
 
