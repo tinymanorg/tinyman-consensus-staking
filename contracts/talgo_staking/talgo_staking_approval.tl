@@ -35,8 +35,8 @@ const bytes TOTAL_STAKER_COUNT_KEY = "total_staker_count"
 const bytes MANAGER_KEY = "manager"
 
 const int RPU_SCALER = 1000000000
-const int POOL_TOKEN_TOTAL_SUPPLY = 18446744073709551615
 const int MAX_UINT64 = 18446744073709551615
+const int ALGO_TOTAL_SUPPLY = 10000000000000000
 
 
 router:
@@ -88,7 +88,7 @@ func init():
         Sender: Global.CurrentApplicationAddress
         ConfigAssetUnitName: "STALGO"
         ConfigAssetName: "Staked tALGO"
-        ConfigAssetTotal: POOL_TOKEN_TOTAL_SUPPLY
+        ConfigAssetTotal: ALGO_TOTAL_SUPPLY
         ConfigAssetDecimals: 6
         ConfigAssetURL: "https://tinyman.org"
         ConfigAssetReserve: Global.CurrentApplicationAddress
