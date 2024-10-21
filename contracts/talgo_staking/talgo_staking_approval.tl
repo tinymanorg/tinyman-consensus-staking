@@ -68,8 +68,20 @@ func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: i
 	app_global_put(MANAGER_KEY, manager_address)
     app_global_put(TINY_POWER_THRESHOLD_KEY, 1000)
 
-    bytes metadata_hash
-    _, metadata_hash = asset_params_get(AssetMetadataHash, tiny_asset_id)
+	# create_application(talgo_asset_id, tiny_asset_id, manager_address, stalgo_asset_id)
+	log(ARC28Event("create_application(uint64,uint64,uint64,address)", itob(talgo_asset_id), itob(tiny_asset_id), itob(vault_app_id), manager_address))
+    return
+end
+
+
+@public()
+func init():
+    assert(Txn.Sender == app_global_get(MANAGER_KEY))
+    assert(!app_global_get(STALGO_ASSET_ID_KEY))
+
+    opt_in_to_asset(app_global_get(TINY_ASSET_ID_KEY))
+    opt_in_to_asset(app_global_get(TALGO_ASSET_ID_KEY))
+
     inner_txn:
         TypeEnum: Acfg
         Sender: Global.CurrentApplicationAddress
@@ -79,7 +91,6 @@ func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: i
         ConfigAssetDecimals: 6
         ConfigAssetURL: "https://tinyman.org"
         ConfigAssetReserve: Global.CurrentApplicationAddress
-        ConfigAssetMetadataHash: metadata_hash
 		ConfigAssetClawback: Global.CurrentApplicationAddress
         ConfigAssetFreeze: Global.CurrentApplicationAddress
         ConfigAssetDefaultFrozen: 1
@@ -88,8 +99,7 @@ func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: i
 
     app_global_put(STALGO_ASSET_ID_KEY, Itxn.CreatedAssetID)
 
-	# create_application(talgo_asset_id, tiny_asset_id, manager_address, stalgo_asset_id)
-	log(ARC28Event("create_application(uint64,uint64,address,uint64)", itob(talgo_asset_id), itob(tiny_asset_id), manager_address, itob(app_global_get(STALGO_ASSET_ID_KEY))))
+    log(ARC28Event("init(uint64)", itob(app_global_get("STALGO_ASSET_ID_KEY"))))
     return
 end
 
@@ -364,4 +374,18 @@ func get_account_voting_power(address: bytes[32]) int:
     end
     int voting_power = extract_uint64(Itxn.LastLog, 4)
     return voting_power
+end
+
+
+func opt_in_to_asset(asset_id: int):
+    inner_txn:
+        TypeEnum: Axfer
+        Sender: Global.CurrentApplicationAddress
+        AssetReceiver: Global.CurrentApplicationAddress
+        AssetAmount: 0
+        XferAsset: asset_id
+        Fee: 0
+    end
+
+    return
 end
