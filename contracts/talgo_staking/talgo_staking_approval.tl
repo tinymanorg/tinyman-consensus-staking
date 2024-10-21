@@ -118,12 +118,14 @@ func create_reward_period(total_reward_amount: int, start_timestamp: int, end_ti
 end
 
 
-func set_tiny_power_threshold(threshold: int)
+@public()
+func set_tiny_power_threshold(threshold: int):
     assert(Txn.Sender == app_global_get(MANAGER_KEY))
 
     app_global_put(TINY_POWER_THRESHOLD_KEY, threshold)
 
     log(ARC28Event("set_tiny_power_threshold(uint64)", itob(threshold)))
+    return
 end
 
 
@@ -208,11 +210,10 @@ func increase_stake(amount: int):
     user_state.staked_amount = user_state.staked_amount + amount
 
     send_stalgo(amount, Txn.Sender)
-    transfer(app_global_get(STALGO_ASSET_ID_KEY), amount, Global.CurrentApplicationAddress, Txn.Sender)
 
     if !user_state.staked_amount:
         current_tiny_power = get_account_voting_power(Txn.Sender)
-        assert(tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))
+        assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))
 
         total_staker_count = app_global_get(TOTAL_STAKER_COUNT_KEY)
         total_staker_count = total_staker_count + 1
@@ -343,11 +344,24 @@ func clawback_stalgo(amount: int, user: bytes[32]):
 end
 
 
-check_received_talgo(txn_index: int, amount: int):
+func check_received_talgo(txn_index: int, amount: int):
     assert(Gtxn[txn_index].TypeEnum == Axfer)
     assert(Gtxn[txn_index].AssetReceiver == Global.CurrentApplicationAddress)
     assert(Gtxn[txn_index].AssetAmount == amount)
     assert(Gtxn[txn_index].XferAsset == app_global_get(TALGO_ASSET_ID_KEY))
 
     return
+end
+
+
+func get_account_voting_power(address: bytes[32]) int:
+    inner_txn:
+        TypeEnum: Appl
+        ApplicationID: app_global_get(VAULT_APP_ID_KEY)
+        ApplicationArgs[0]: "get_tiny_power_of"
+        ApplicationArgs[1]: address
+        Fee: 0
+    end
+    int voting_power = extract_uint64(Itxn.LastLog, 4)
+    return voting_power
 end
