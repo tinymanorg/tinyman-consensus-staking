@@ -145,7 +145,11 @@ class TestSetup(BaseTestCase):
         vote_first = 0
         vote_last = 100000
         vote_key_dilution = int(100000 ** 0.5)
+
         fee = 0
+        self.t_algo_client.go_online(node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee)
+
+        fee = 2_000_000
         self.t_algo_client.go_online(node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee)
         a = encode_address(self.t_algo_client.get_global(b"account_1"))
         print(self.ledger.get_raw_account(a))

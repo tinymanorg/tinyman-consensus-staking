@@ -1,6 +1,6 @@
 #pragma version 10
 
-
+# This is a singleton app.
 # This app manages up to 5 accounts that can be brought online to participate in consensus.
 # The accounts potentially earn Algo through incestivised consensus when online.
 # The app issues tAlgo in exchange for Algo.
@@ -10,12 +10,36 @@
 # The node_managers receive no reward or payment from this app.
 
 
+## User Flow
+# Opt-In to tAlgo
+# Transfer Algo to App Account
+# Call mint(algo_amount)
+# Receive tAlgo
+# ...
+# Transfer tAlgo to App Account
+# Call burn(talgo_amount)
+# Receive Algo
+
+
+## Manager Flow
+# create_application
+# Transfer 2.0 Algo
+# Call init()
+# Call set_node_manager for 1 or more node accounts
+# Call change_online_status with a keyreg in a group to bring an account online
+# Call move_stake to distribute stake between nodes as necessary
+
 const int TALGO_TOTAL_SUPPLY = 10_000_000_000_000_000
 const int RATE_SCALER = 1_000_000
 # The protocol limit is 70M. We set 69M to allow space for rewards to accumulate.
 const int MAX_ACCOUNT_BALANCE = 69_000_000_000_000
 # A simple app that rekeys its account to the creator on creation. See auxapp.tl
 const bytes AUX_PROGRAM = "\n1\x18\x81\x00\x12D\xb1\x81\x01\xb2\x101\x00\xb2\x071\x00\xb2 \x81\x00\xb2\x01\xb3\x81\x01C"
+
+# This is a LogicSig that allows anything
+# const bytes KEY_REG_LOGIC_SIG = "\n\x81\x01C"
+# KEY_REG_LOGIC_SIG_ADDRESS = U3ZXEUNFRSUDPPNFC6U7OBYO4S4AUOEP4RDBI23L2Q5TX3K5LTSVWQOKFM
+const bytes KEY_REG_LOGIC_SIG_ADDRESS = "\xa6\xf3rQ\xa5\x8c\xa87\xbd\xa5\x17\xa9\xf7\x07\x0e\xe4\xb8\n8\x8f\xe4F\x14kk\xd4;;\xed]\\\xe5"
 
 router:
     create_application
@@ -31,8 +55,7 @@ router:
     set_stake_manager
     set_fee_collector
     set_protocol_fee
-    go_online
-    go_offline
+    change_online_status
 end
 
 
@@ -42,15 +65,14 @@ end
 @public(OnCompletion=CreateApplication)
 func create_application(manager_address: bytes[32]):
 	app_global_put("manager", manager_address)
-    app_global_put("node_manager_0", manager_address)
-    app_global_put("node_manager_1", manager_address)
-    app_global_put("node_manager_2", manager_address)
-    app_global_put("node_manager_3", manager_address)
-    app_global_put("node_manager_4", manager_address)
+    app_global_put("node_manager_0", Global.ZeroAddress)
+    app_global_put("node_manager_1", Global.ZeroAddress)
+    app_global_put("node_manager_2", Global.ZeroAddress)
+    app_global_put("node_manager_3", Global.ZeroAddress)
+    app_global_put("node_manager_4", Global.ZeroAddress)
     app_global_put("stake_manager", manager_address)
     app_global_put("fee_collector", manager_address)
     app_global_put("protocol_fee", 10)
-    app_global_put("fee_balance", 0)
 	# create_application(manager_address)
 	log(ARC28Event("create_application(address)", manager_address))
     return
@@ -215,36 +237,30 @@ end
 
 
 @public()
-func go_online(node_index: int, vote_pk: bytes[32], selection_pk: bytes[32], state_proof_pk: bytes[64], vote_first: int, vote_last: int, vote_key_dilution: int, fee: int):
+func change_online_status(node_index: int):
     bytes[32] user_address = Txn.Sender
-    bytes key = concat("node_manager_", ascii_digit(node_index))
-    assert(user_address == app_global_get(key))
+    assert(user_address == app_global_get(concat("node_manager_", ascii_digit(node_index))))
     bytes account_address = app_global_get(concat("account_", ascii_digit(node_index)))
-    app_global_put("fee_balance", app_global_get("fee_balance") - fee)
-    inner_txn:
-        Sender: account_address
-        TypeEnum: Keyreg
-        VotePK: vote_pk
-        SelectionPK: selection_pk
-        StateProofPK: state_proof_pk
-        VoteFirst: vote_first
-        VoteLast: vote_last
-        VoteKeyDilution: vote_key_dilution
-        Fee: fee
+
+    # The next txn in the group will be signed by the logicsig
+    # Ensure that it rekeys back to the application address
+    # Ensure that it is a Keyreg
+    # Allow any keyreg fields
+    # The point of this is to allow keyreg fields in future that we do not know about at compile time.
+    assert(Gtxn[+1].TypeEnum == Keyreg)
+    assert(Gtxn[+1].Sender == account_address)
+    assert(Gtxn[+1].RekeyTo == Global.CurrentApplicationAddress)
+
+    # If an increased fee is set in the keyreg txn, this exact fee must be paid to the same account in the txn prior to this.
+    if Gtxn[+1].Fee > 0:
+        assert(Gtxn[-1].Receiver == account_address)
+        assert(Gtxn[-1].Amount == Gtxn[+1].Fee)
     end
-    return
-end
-
-
-@public()
-func go_offline(node_index: int):
-    bytes[32] user_address = Txn.Sender
-    bytes key = concat("node_manager_", ascii_digit(node_index))
-    assert(user_address == app_global_get(key))
-    bytes account_address = app_global_get(concat("account_", ascii_digit(node_index)))
     inner_txn:
         Sender: account_address
-        TypeEnum: Keyreg
+        TypeEnum: Pay
+        RekeyTo: KEY_REG_LOGIC_SIG_ADDRESS
+        Fee: 0
     end
     return
 end
@@ -254,6 +270,7 @@ end
 func move_stake(from_index: int, to_index: int, amount: int):
     bytes[32] user_address = Txn.Sender
     assert(user_address == app_global_get("stake_manager"))
+    assert(to_index < 5)
     inner_txn:
         TypeEnum: Pay
         Sender: app_global_get(concat("account_", ascii_digit(from_index)))
@@ -264,14 +281,6 @@ func move_stake(from_index: int, to_index: int, amount: int):
     return
 end
 
-
-@public()
-func fund_fees():
-    assert(Gtxn[-1].Receiver == Global.CurrentApplicationAddress)
-    # TODO: assert other necessary stuff!
-    app_global_put("fee_balance", app_global_get("fee_balance") + Gtxn[-1].Amount)
-    return
-end
 
 #### ---------------------------------------- Internal Functions ---------------------------------------------- ####
 
@@ -358,7 +367,6 @@ func full_balance() int:
     algo = algo + balance(app_global_get("account_3"))
     algo = algo + balance(app_global_get("account_4"))
     algo = algo - app_global_get("initial_balance")
-    algo = algo - app_global_get("fee_balance")
     return algo
 end
 

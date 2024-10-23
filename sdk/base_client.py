@@ -17,6 +17,7 @@ class BaseClient():
         self.keys = {}
         self.add_key(user_address, user_sk)
         self.current_timestamp = None
+        self.simulate = False
     
     def get_suggested_params(self):
         return self.algod.suggested_params()
@@ -27,13 +28,22 @@ class BaseClient():
     def _submit(self, transactions, additional_fees=0):
         transactions = self.flatten_transactions(transactions)
         fee = transactions[0].fee
+        n = 0
         for txn in transactions:
-            txn.fee = 0
-        transactions[0].fee = (len(transactions) + additional_fees) * fee
+            if txn.fee == fee:
+                txn.fee = 0
+                n += 1
+        transactions[0].fee = (n + additional_fees) * fee
         txn_group = TransactionGroup(transactions)
         for address, key in self.keys.items():
-            txn_group.sign_with_private_key(address, key)
-        txn_info = txn_group.submit(self.algod, wait=True)
+            if isinstance(key, transaction.LogicSigAccount):
+                txn_group.sign_with_logicsig(key, address=address)
+            else:
+                txn_group.sign_with_private_key(address, key)
+        if self.simulate:
+            txn_info = self.algod.simulate_raw_transactions(txn_group.signed_transactions)
+        else:
+            txn_info = txn_group.submit(self.algod, wait=True)
         return txn_info
     
     def flatten_transactions(self, txns):

@@ -5,6 +5,8 @@ from .base_client import BaseClient
 
 class TAlgoClient(BaseClient):
 
+    keyreg_lsig = transaction.LogicSigAccount(b"\n\x81\x01C")
+
     def init(self):
         sp = self.get_suggested_params()
         transactions = [
@@ -104,27 +106,46 @@ class TAlgoClient(BaseClient):
         return self._submit(transactions, additional_fees=1)
 
     def go_online(self, node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee):
+        account_address = encode_address(self.get_global(b"account_%i" % node_index))
+        self.add_key(account_address, self.keyreg_lsig)
         sp = self.get_suggested_params()
         transactions = [
+            transaction.PaymentTxn(
+                sender=self.user_address,
+                receiver=account_address,
+                sp=sp,
+                amt=fee
+            ) if fee else None,
             transaction.ApplicationCallTxn(
                 sender=self.user_address,
                 on_complete=transaction.OnComplete.NoOpOC,
                 sp=sp,
                 index=self.app_id,
-                app_args=["go_online", node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee],
+                app_args=["change_online_status", node_index],
                 accounts=[
-                    encode_address(self.get_global(b"account_1")),
-                    encode_address(self.get_global(b"account_2")),
-                    encode_address(self.get_global(b"account_3")),
-                    encode_address(self.get_global(b"account_4")),
                 ],
                 foreign_assets=[
                 ]
             ),
+            transaction.KeyregOnlineTxn(
+                sender=account_address,
+                sp=sp,
+                rekey_to=self.application_address,
+                votekey=vote_pk,
+                selkey=selection_pk,
+                votefst=vote_first,
+                votelst=vote_last,
+                votekd=vote_key_dilution,
+                sprfkey=state_proof_pk,
+            )
         ]
+        if fee:
+            transactions[2].fee = fee
         return self._submit(transactions, additional_fees=1)
     
     def go_offline(self, node_index):
+        account_address = encode_address(self.get_global(b"account_%i" % node_index))
+        self.add_key(account_address, self.keyreg_lsig)
         sp = self.get_suggested_params()
         transactions = [
             transaction.ApplicationCallTxn(
@@ -132,15 +153,16 @@ class TAlgoClient(BaseClient):
                 on_complete=transaction.OnComplete.NoOpOC,
                 sp=sp,
                 index=self.app_id,
-                app_args=["go_offline", node_index],
+                app_args=["change_online_status", node_index],
                 accounts=[
-                    encode_address(self.get_global(b"account_1")),
-                    encode_address(self.get_global(b"account_2")),
-                    encode_address(self.get_global(b"account_3")),
-                    encode_address(self.get_global(b"account_4")),
                 ],
                 foreign_assets=[
                 ]
             ),
+            transaction.KeyregOfflineTxn(
+                sender=account_address,
+                sp=sp,
+                rekey_to=self.application_address,
+            )
         ]
         return self._submit(transactions, additional_fees=1)
