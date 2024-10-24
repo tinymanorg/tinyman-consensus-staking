@@ -45,9 +45,10 @@ class BaseTestCase(unittest.TestCase):
         self.ledger.create_app(app_id=self.vault_app_id, approval_program=vault_approval_program, creator=self.app_creator_address, local_ints=0, local_bytes=0, global_ints=4, global_bytes=0)
         self.ledger.set_global_state(self.vault_app_id, {"tiny_asset_id": self.tiny_asset_id, "total_locked_amount": 0, "total_power_count": 0, "last_total_power_timestamp": 0})
         self.ledger.set_account_balance(get_application_address(self.vault_app_id), 300_000)
+        self.ledger.boxes[self.vault_app_id] = {}
 
-        self.t_algo_asset_id = 78910
-        self.ledger.create_asset(self.t_algo_asset_id, 
+        self.talgo_asset_id = 78910
+        self.ledger.create_asset(self.talgo_asset_id, 
             {
                 "creator": self.tiny_asset_creator_address,
                 "decimals": 6,
@@ -65,10 +66,10 @@ class BaseTestCase(unittest.TestCase):
 
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
         self.application_address = get_application_address(self.app_id)
-        self.st_algo_asset_id = 1112131
+        self.stalgo_asset_id = 1112131
 
         self.algod = JigAlgod(self.ledger)
-        self.t_algo_staking_client = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.t_algo_asset_id, self.user_address, self.user_sk)
+        self.t_algo_staking_client = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.user_address, self.user_sk)
 
     def create_talgo_staking_app(self, app_id, app_creator_address):
         self.ledger.create_app(
@@ -84,7 +85,7 @@ class BaseTestCase(unittest.TestCase):
         self.ledger.set_global_state(
             app_id,
             {
-                b"talgo_asset_id": self.t_algo_asset_id,
+                b"talgo_asset_id": self.talgo_asset_id,
                 b"tiny_asset_id": self.tiny_asset_id,
                 b"vault_app_id": self.vault_app_id,
                 b"manager": decode_address(self.manager_address),
@@ -97,10 +98,10 @@ class BaseTestCase(unittest.TestCase):
 
     def init_talgo_staking_app(self):
         self.ledger.accounts[self.application_address]['balances'][self.tiny_asset_id] = [0, False]
-        self.ledger.accounts[self.application_address]['balances'][self.t_algo_asset_id] = [0, False]
+        self.ledger.accounts[self.application_address]['balances'][self.talgo_asset_id] = [0, False]
 
         self.ledger.create_asset(
-            self.st_algo_asset_id,
+            self.stalgo_asset_id,
             {
                 "clawback": self.application_address,
                 "creator": self.application_address,
@@ -117,10 +118,11 @@ class BaseTestCase(unittest.TestCase):
                 "url-b64": "aHR0cHM6Ly90aW55bWFuLm9yZw=="
             }
         )
-    
+        self.ledger.global_states[self.app_id][b"stalgo_asset_id"] = self.stalgo_asset_id
+
     def create_reward_period(self, total_reward_amount=10_000_000, start_timestamp=None, end_timestamp=None):
         if not (start_timestamp and end_timestamp):
-            start_timestamp = int(datetime(2025, 3, 25, tzinfo=timezone.utc).timestamp())
+            start_timestamp = start_timestamp or int(datetime(2025, 3, 25, tzinfo=timezone.utc).timestamp())
             end_timestamp = start_timestamp + WEEK
 
         reward_period = RewardPeriod()
@@ -130,3 +132,13 @@ class BaseTestCase(unittest.TestCase):
 
         self.ledger.boxes[self.app_id][self.t_algo_staking_client.get_reward_period_box_name(0)] = reward_period
         self.ledger.global_states[self.app_id][b"period_count"] = 1
+        self.ledger.global_states[self.app_id][b"current_period_index"] = 0
+
+    def simulate_user_voting_power(self, account_address=None, locked_amount=1000, lock_end_time=None):
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+
+        account_address = account_address or self.user_address
+        lock_end_time = lock_end_time or (now + 125798400)
+        account_state = int_to_bytes(locked_amount) + int_to_bytes(lock_end_time) + int_to_bytes(1) + int_to_bytes(0)
+
+        self.ledger.set_box(self.app_id, key=decode_address(account_address), value=account_state)

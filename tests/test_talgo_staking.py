@@ -45,13 +45,13 @@ class TAlgoStakingTests(BaseTestCase):
                 sender=account_address,
                 sp=self.sp,
                 on_complete=OnComplete.NoOpOC,
-                app_args=[b"create_application", self.t_algo_asset_id, self.tiny_asset_id, self.vault_app_id, decode_address(self.manager_address)],
+                app_args=[b"create_application", self.talgo_asset_id, self.tiny_asset_id, self.vault_app_id, decode_address(self.manager_address)],
                 approval_program=talgo_staking_approval_program.bytecode,
                 clear_program=talgo_staking_clear_state_program.bytecode,
                 global_schema=transaction.StateSchema(num_uints=APP_GLOBAL_INTS, num_byte_slices=APP_GLOBAL_BYTES),
                 local_schema=transaction.StateSchema(num_uints=APP_LOCAL_INTS, num_byte_slices=APP_LOCAL_BYTES),
                 extra_pages=EXTRA_PAGES,
-                foreign_assets=[self.t_algo_asset_id, self.tiny_asset_id],
+                foreign_assets=[self.talgo_asset_id, self.tiny_asset_id],
             ),
         ]
 
@@ -64,7 +64,7 @@ class TAlgoStakingTests(BaseTestCase):
         self.assertDictEqual(
             self.ledger.global_states[app_id],
             {
-                b"talgo_asset_id": self.t_algo_asset_id,
+                b"talgo_asset_id": self.talgo_asset_id,
                 b"tiny_asset_id": self.tiny_asset_id,
                 b"vault_app_id": self.vault_app_id,
                 b"manager": decode_address(self.manager_address),
@@ -84,7 +84,7 @@ class TAlgoStakingTests(BaseTestCase):
                 sp=self.sp,
                 on_complete=OnComplete.NoOpOC,
                 app_args=[b"init"],
-                foreign_assets=[self.t_algo_asset_id, self.tiny_asset_id]
+                foreign_assets=[self.talgo_asset_id, self.tiny_asset_id]
             ),
         ]
 
@@ -99,7 +99,7 @@ class TAlgoStakingTests(BaseTestCase):
         stalgo_create_itx = init_transaction[b"dt"][b"itx"][2]
 
         self.assertEqual(tiny_optin_itx[b'txn'][b'xaid'], self.tiny_asset_id)
-        self.assertEqual(talgo_optin_itx[b'txn'][b'xaid'], self.t_algo_asset_id)
+        self.assertEqual(talgo_optin_itx[b'txn'][b'xaid'], self.talgo_asset_id)
 
         stalgo_asset_id = stalgo_create_itx[b'caid']
 
@@ -107,7 +107,7 @@ class TAlgoStakingTests(BaseTestCase):
             self.ledger.global_states[self.app_id],
             {
                 b"stalgo_asset_id": stalgo_asset_id,
-                b"talgo_asset_id": self.t_algo_asset_id,
+                b"talgo_asset_id": self.talgo_asset_id,
                 b"tiny_asset_id": self.tiny_asset_id,
                 b"vault_app_id": self.vault_app_id,
                 b"manager": decode_address(self.manager_address),
@@ -120,23 +120,42 @@ class TAlgoStakingTests(BaseTestCase):
         self.ledger.set_account_balance(self.application_address, 10_000_000)
         self.init_talgo_staking_app()
 
-        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.t_algo_asset_id, self.manager_address, self.manager_sk)
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
 
         start_timestamp = int(datetime(2025, 3, 24, tzinfo=timezone.utc).timestamp())
         end_timestamp = start_timestamp + WEEK
         client_for_manager.create_reward_period(1_000_000, start_timestamp, end_timestamp)
 
     def test_set_tiny_power_threshold(self):
-        pass
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
 
     def test_update_state(self):
         pass
 
     def test_increase_stake(self):
-        pass
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        self.create_reward_period(start_timestamp=now)
+
+        self.simulate_user_voting_power()
+
+        self.ledger.next_timestamp = now
+        self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
+        self.t_algo_staking_client.increase_stake(100_000)
 
     def test_decrease_stake(self):
-        pass
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
 
     def test_claim_rewards(self):
-        pass
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
