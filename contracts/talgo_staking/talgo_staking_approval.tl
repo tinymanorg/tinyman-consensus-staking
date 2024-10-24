@@ -64,13 +64,13 @@ end
 @public(OnCompletion=CreateApplication)
 func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: int, manager_address: bytes[32]):
     app_global_put(TALGO_ASSET_ID_KEY, talgo_asset_id)
-	app_global_put(TINY_ASSET_ID_KEY, tiny_asset_id)
+    app_global_put(TINY_ASSET_ID_KEY, tiny_asset_id)
     app_global_put(VAULT_APP_ID_KEY, vault_app_id)
-	app_global_put(MANAGER_KEY, manager_address)
+    app_global_put(MANAGER_KEY, manager_address)
     app_global_put(TINY_POWER_THRESHOLD_KEY, 1000)
 
-	# create_application(talgo_asset_id, tiny_asset_id, manager_address, stalgo_asset_id)
-	log(ARC28Event("create_application(uint64,uint64,uint64,address)", itob(talgo_asset_id), itob(tiny_asset_id), itob(vault_app_id), manager_address))
+    # create_application(talgo_asset_id, tiny_asset_id, manager_address, stalgo_asset_id)
+    log(ARC28Event("create_application(uint64,uint64,uint64,address)", itob(talgo_asset_id), itob(tiny_asset_id), itob(vault_app_id), manager_address))
     return
 end
 
@@ -159,21 +159,23 @@ func update_state(period_index: int):
         int reward_rate_per_time = current_reward_period.total_reward_amount / duration
         app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
     else:
-        assert(current_reward_period.end_timestamp <= Global.LatestTimestamp)
+        assert(current_reward_period.end_timestamp >= Global.LatestTimestamp)
     end
 
     int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY)
     int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
     int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
-    
-    int time_delta = Global.LatestTimestamp -  last_update_timestamp
 
-    int reward_rate_per_unit_per_time = (reward_rate_per_time * RPU_SCALER) / total_staked_amount
-    accumulated_rewards_per_unit = accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
+    if total_staked_amount:
+        int time_delta = Global.LatestTimestamp - last_update_timestamp
 
-    app_global_put(LAST_UPDATE_TIMESTAMP_KEY, Global.LatestTimestamp)
-    app_global_put(ACCUMULATED_REWARDS_PER_UNIT, accumulated_rewards_per_unit)
+        int reward_rate_per_unit_per_time = (reward_rate_per_time * RPU_SCALER) / total_staked_amount
+        accumulated_rewards_per_unit = accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
+
+        app_global_put(LAST_UPDATE_TIMESTAMP_KEY, Global.LatestTimestamp)
+        app_global_put(ACCUMULATED_REWARDS_PER_UNIT, accumulated_rewards_per_unit)
+    end
 
     log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(last_update_timestamp), itob(current_reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
     log(ARC28Event("update_state(uint64)", itob(period_index)))
