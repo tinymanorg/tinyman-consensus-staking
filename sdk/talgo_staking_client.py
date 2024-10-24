@@ -16,12 +16,14 @@ RewardPeriod = get_struct("RewardPeriod")
 UserState = get_struct("UserState")
 
 
-class Client():
-    def __init__(self, algod, staking_app_id, vault_app_id, user_address, user_sk) -> None:
+class TAlgoStakingClient():
+    def __init__(self, algod, staking_app_id, vault_app_id, tiny_asset_id, t_algo_asset_id, user_address, user_sk) -> None:
         self.algod = algod
         self.app_id = staking_app_id
         self.application_address = get_application_address(self.app_id)
         self.vault_app_id = vault_app_id
+        self.tiny_asset_id = tiny_asset_id
+        self.t_algo_asset_id = t_algo_asset_id
         self.user_address = user_address
         self.keys = {}
         self.add_key(user_address, user_sk)
@@ -94,13 +96,13 @@ class Client():
         cost += get_box_costs(boxes or {})
         return cost
 
-    def get_reward_period_box_name(index: int):
+    def get_reward_period_box_name(self, index: int):
         return int_to_bytes(index)
 
     def create_reward_period(self, total_reward_amount: int, start_timestamp: int, end_timestamp: int):
         sp = self.get_suggested_params()
 
-        period_count = self.get_global(PERIOD_COUNT_KEY)
+        period_count = self.get_global(PERIOD_COUNT_KEY) or 0
         new_boxes = {}
         new_boxes[self.get_reward_period_box_name(period_count)] = RewardPeriod
 
