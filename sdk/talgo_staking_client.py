@@ -17,13 +17,14 @@ UserState = get_struct("UserState")
 
 
 class TAlgoStakingClient():
-    def __init__(self, algod, staking_app_id, vault_app_id, tiny_asset_id, t_algo_asset_id, user_address, user_sk) -> None:
+    def __init__(self, algod, staking_app_id, vault_app_id, tiny_asset_id, talgo_asset_id, stalgo_asset_id, user_address, user_sk) -> None:
         self.algod = algod
         self.app_id = staking_app_id
         self.application_address = get_application_address(self.app_id)
         self.vault_app_id = vault_app_id
         self.tiny_asset_id = tiny_asset_id
-        self.t_algo_asset_id = t_algo_asset_id
+        self.talgo_asset_id = talgo_asset_id
+        self.stalgo_asset_id = stalgo_asset_id
         self.user_address = user_address
         self.keys = {}
         self.add_key(user_address, user_sk)
@@ -149,7 +150,7 @@ class TAlgoStakingClient():
 
         return self._submit(transactions)
     
-    def get_user_state_box_name(account_address):
+    def get_user_state_box_name(self, account_address: str):
         return decode_address(account_address)
 
     def increase_stake(self, amount: int):
@@ -168,12 +169,29 @@ class TAlgoStakingClient():
                 receiver=self.application_address,
                 amt=self.calculate_min_balance(boxes=new_boxes)
             ) if new_boxes else None,
+            # TODO: add a check
+            transaction.AssetTransferTxn(
+                index=self.stalgo_asset_id,
+                sender=self.user_address,
+                receiver=self.user_address,
+                sp=sp,
+                amt=0
+            ),
+            transaction.AssetTransferTxn(
+                index=self.talgo_asset_id,
+                sender=self.user_address,
+                receiver=self.application_address,
+                sp=sp,
+                amt=amount
+            ),
             transaction.ApplicationCallTxn(
                 sender=self.user_address,
                 on_complete=transaction.OnComplete.NoOpOC,
                 sp=sp,
                 index=self.app_id,
                 app_args=["increase_stake", amount],
+                foreign_apps=[self.vault_app_id],
+                foreign_assets=[self.stalgo_asset_id],
                 boxes=[
                     (0, user_state_box_name),
                     (0, self.get_reward_period_box_name(current_period_index)),
