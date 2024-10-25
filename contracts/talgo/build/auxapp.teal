@@ -1,0 +1,27 @@
+#pragma version 10
+
+// tl:3: assert(Txn.ApplicationID == 0)
+txn ApplicationID
+pushint 0
+==
+assert
+// tl:4: inner_txn:
+itxn_begin
+    // tl:5: TypeEnum: Pay
+    pushint 1                                               // Pay
+    itxn_field TypeEnum
+    // tl:6: Receiver: Txn.Sender
+    txn Sender
+    itxn_field Receiver
+    // tl:7: RekeyTo: Txn.Sender
+    txn Sender
+    itxn_field RekeyTo
+    // tl:8: Fee: 0
+    pushint 0
+    itxn_field Fee
+itxn_submit
+// end inner_txn
+// tl:10: exit(1)
+pushint 1
+return
+
