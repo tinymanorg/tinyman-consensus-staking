@@ -5,39 +5,30 @@
 # The accounts potentially earn Algo through incestivised consensus when online.
 # The app issues tAlgo in exchange for Algo.
 # The Algo in the accounts is collectively owned by the holders of tAlgo.
-# The accounts can be brought online for a node by the node_manager account set for each account
+# The accounts can be brought online for a node by the node_manager account set for each account.
 # The stake_manager account can move Algo between the accounts to redistribute the stake as necessary.
 # The node_managers receive no reward or payment from this app.
+# The protocol collects a portion of rewards as a protocol fee.
 
 
-## User Flow
-# Opt-In to tAlgo
-# Transfer Algo to App Account
-# Call mint(algo_amount)
-# Receive tAlgo
-# ...
-# Transfer tAlgo to App Account
-# Call burn(talgo_amount)
-# Receive Algo
-
-
-## Manager Flow
-# create_application
-# Transfer 2.0 Algo
-# Call init()
-# Call set_node_manager for 1 or more node accounts
-# Call change_online_status with a keyreg in a group to bring an account online
-# Call move_stake to distribute stake between nodes as necessary
-
+# Same total supply as Algo. In reality the nowhere near the total supply of Algo can be staked in this contract
 const int TALGO_TOTAL_SUPPLY = 10_000_000_000_000_000
+
+# The rate of Algo/tAlgo is scaled by this value for integer storage and calculation
 const int RATE_SCALER = 1_000_000
-# The protocol limit is 70M. We set 69M to allow space for rewards to accumulate.
+
+# The Algorand protocol limit is 70M Algo per online account to remain eligible for proposer rewards. 
+# We set 69M to allow space for rewards to accumulate.
+# This means a max of 345M Algo (69M*5) can be staked with tAlgo
+# TODO: this might be made configurable or dependant on a protocol field
 const int MAX_ACCOUNT_BALANCE = 69_000_000_000_000
+
 # A simple app that rekeys its account to the creator on creation. See auxapp.tl
 const bytes AUX_PROGRAM = "\n1\x18\x81\x00\x12D\xb1\x81\x01\xb2\x101\x00\xb2\x071\x00\xb2 \x81\x00\xb2\x01\xb3\x81\x01C"
 
-# This is a LogicSig that allows anything
-# const bytes KEY_REG_LOGIC_SIG = "\n\x81\x01C"
+# This is a LogicSig that allows anything. It is used with change_online_status()
+# TEAL: "#pragma version 10\npushint 1\nreturn"
+# BYTES: "\n\x81\x01C"
 # KEY_REG_LOGIC_SIG_ADDRESS = U3ZXEUNFRSUDPPNFC6U7OBYO4S4AUOEP4RDBI23L2Q5TX3K5LTSVWQOKFM
 const bytes KEY_REG_LOGIC_SIG_ADDRESS = "\xa6\xf3rQ\xa5\x8c\xa87\xbd\xa5\x17\xa9\xf7\x07\x0e\xe4\xb8\n8\x8f\xe4F\x14kk\xd4;;\xed]\\\xe5"
 
@@ -61,19 +52,31 @@ end
 
 #### ---------------------------------------- Public Functions ---------------------------------------------- ####
 
-
+# permission: anyone
 @public(OnCompletion=CreateApplication)
 func create_application(manager_address: bytes[32]):
-	app_global_put("manager", manager_address)
+	# Set initial values for all configurable roles and settings
+
+    # The manager has permission to change other manager roles and set the protocol fee
+    app_global_put("manager", manager_address)
+
+    # The node manager for each account has permission to bring the account online/offline with Keyreg
     app_global_put("node_manager_0", Global.ZeroAddress)
     app_global_put("node_manager_1", Global.ZeroAddress)
     app_global_put("node_manager_2", Global.ZeroAddress)
     app_global_put("node_manager_3", Global.ZeroAddress)
     app_global_put("node_manager_4", Global.ZeroAddress)
+
+    # The stake manager has permission to move Algo between node accounts.
     app_global_put("stake_manager", manager_address)
+
+    # The fee collector is the account that receives the protocol rewards when claim_protocol_rewards is called.
     app_global_put("fee_collector", manager_address)
+
+    # The percentage of rewards claimable by the protocol (Tinyman)
     app_global_put("protocol_fee", 10)
-	# create_application(manager_address)
+	
+    # create_application(manager_address)
 	log(ARC28Event("create_application(address)", manager_address))
     return
 end
@@ -87,11 +90,15 @@ func update_application():
 end
 
 
+# permission: anyone
 @public()
 func init():
     # ensure init has not been called before
     assert(!app_global_get("talgo_asset_id"))
+
+    # Save the current Algo balance so this can be subtracted from the full balance later
     app_global_put("initial_balance", balance(Global.CurrentApplicationAddress))
+    
     # create talgo ASA
     inner_txn:
         TypeEnum: Acfg
@@ -105,30 +112,34 @@ func init():
         Fee: 0
     end
     int talgo_asset_id = Itxn.CreatedAssetID
+    # Save the talgo asset id
     app_global_put("talgo_asset_id", talgo_asset_id)
+
+    # Set the state variables to initial values
     app_global_put("minted_talgo", 0)
+    app_global_put("algo_balance", 0)
     app_global_put("rate", 1 * RATE_SCALER)
 
+    # Set the 5 accounts used for stake
+    # The first is the application account
     app_global_put("account_0", Global.CurrentApplicationAddress)
-
     # create 4 auxiliary accounts
     # each account creation requires in 3 inner txns
-    create_auxiliary_account(1)
-    create_auxiliary_account(2)
-    create_auxiliary_account(3)
-    create_auxiliary_account(4)
+    app_global_put("account_1", create_auxiliary_account())
+    app_global_put("account_2", create_auxiliary_account())
+    app_global_put("account_3", create_auxiliary_account())
+    app_global_put("account_4", create_auxiliary_account())
 
-    app_global_put("algo_balance", full_balance())
+    log(ARC28Event("init(int,address,address,address,address,address)", itob(talgo_asset_id), app_global_get("account_0"), app_global_get("account_1"), app_global_get("account_2"), app_global_get("account_3"), app_global_get("account_4")))
     return
 end
 
 
+# permission: anyone
 @public()
 func mint(algo_amount: int):
-    assert(algo_amount == Gtxn[-1].Amount)
+    assert(Gtxn[-1].Amount == algo_amount)
     assert(Gtxn[-1].Receiver == Global.CurrentApplicationAddress)
-    # TODO: assert that receiver is this account!
-    # TODO: assert other necessary stuff!
     # 0. Ensure Algo balance of account 0 is still less than the max stake allowed to be eligible for rewards (allowing for some margin)
     # If the balance is too high minting is not available until the accounts are rebalanced with move_stake (or stake is reduced)
     # We can assume the balances of accounts 1-4 are kept below the max through the manual move_stake operations 
@@ -136,6 +147,7 @@ func mint(algo_amount: int):
     assert(balance(app_global_get("account_0")) < MAX_ACCOUNT_BALANCE)
     # 1. Update state to account for rewards received since the last operation
 	update_rewards_and_rate(algo_amount)
+    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
     # 2. Calculate the amount of tAlgo for the given Algo
 	int talgo_amount = calc_talgo(algo_amount)
     # 3. Update the tracked tAlgo & Algo amounts
@@ -143,18 +155,20 @@ func mint(algo_amount: int):
     app_global_put("algo_balance", app_global_get("algo_balance") + algo_amount)
     # 4. Transfer the tAlgo
 	transfer_talgo(Txn.Sender, talgo_amount)
+    log(ARC28Event("mint(address,int,int)", itob(algo_amount), itob(talgo_amount)))
 	return
 end
 
 
+# permission: anyone
 @public()
 func burn(talgo_amount: int):
-    assert(talgo_amount == Gtxn[-1].AssetAmount)
+    assert(Gtxn[-1].AssetAmount == talgo_amount)
     assert(Gtxn[-1].AssetReceiver == Global.CurrentApplicationAddress)
     assert(Gtxn[-1].XferAsset == app_global_get("talgo_asset_id"))
-    # TODO: assert other necessary stuff!
     # 1. Update state to account for rewards received since the last operation
 	update_rewards_and_rate(0)
+    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
     # 2. Calculate the amount of Algo for the given tAlgo
 	int algo_amount = calc_algo(talgo_amount)
     # 3. Update the tracked tAlgo & Algo amounts
@@ -162,25 +176,34 @@ func burn(talgo_amount: int):
     app_global_put("algo_balance", app_global_get("algo_balance") - algo_amount)
     # 4. Transfer the Algo
 	transfer_algo(Txn.Sender, algo_amount)
+    log(ARC28Event("burn(address,int,int)", itob(talgo_amount), itob(algo_amount)))
 	return
 end
 
 
+# permission: anyone
 @public()
 func claim_protocol_rewards():
 	transfer_talgo(UncheckedCast(app_global_get("fee_collector"), bytes[32]), app_global_get("protocol_talgo"))
-    app_global_put("protocol_talgo", 0)
+    log(ARC28Event("claim_protocol_rewards(int)", itob(app_global_get("protocol_talgo"))))
     return
 end
 
 
+# This function updates application state to account for any recently received rewards.
+# These updates will happen in mint/burn in any case so calling this function is not required.
+# It may be useful to sync the state if no mint/burn has happened for some time.
+# It can also be useful for calling with Algod Simulate to retrieve the current rate without offline calculations.
+# permission: anyone
 @public()
 func sync():
     update_rewards_and_rate(0)
+    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
     return
 end
 
 
+# permission: manager
 @public()
 func set_manager(new_manager: bytes[32]):
     assert(Txn.Sender == app_global_get("manager"))
@@ -191,6 +214,8 @@ func set_manager(new_manager: bytes[32]):
 end
 
 
+# This function sets the node manager for a specific account.
+# permission: manager
 @public()
 func set_node_manager(node_index: int, new_node_manager: bytes[32]):
     bytes[32] user_address = Txn.Sender
@@ -198,11 +223,12 @@ func set_node_manager(node_index: int, new_node_manager: bytes[32]):
 
     bytes key = concat("node_manager_", ascii_digit(node_index))
     app_global_put(key, new_node_manager)
-    log(ARC28Event("set_node_manager(int,address)", node_index, new_node_manager))
+    log(ARC28Event("set_node_manager(int,address)", itob(node_index), new_node_manager))
     return
 end
 
 
+# permission: manager
 @public()
 func set_stake_manager(new_stake_manager: bytes[32]):
     bytes[32] user_address = Txn.Sender
@@ -214,6 +240,7 @@ func set_stake_manager(new_stake_manager: bytes[32]):
 end
 
 
+# permission: manager
 @public()
 func set_fee_collector(new_fee_collector: bytes[32]):
     bytes[32] user_address = Txn.Sender
@@ -225,6 +252,7 @@ func set_fee_collector(new_fee_collector: bytes[32]):
 end
 
 
+# permission: manager
 @public()
 func set_protocol_fee(fee_amount: int):
     bytes[32] user_address = Txn.Sender
@@ -236,6 +264,7 @@ func set_protocol_fee(fee_amount: int):
 end
 
 
+# permission: node_manager_{i}
 @public()
 func change_online_status(node_index: int):
     bytes[32] user_address = Txn.Sender
@@ -262,10 +291,12 @@ func change_online_status(node_index: int):
         RekeyTo: KEY_REG_LOGIC_SIG_ADDRESS
         Fee: 0
     end
+    log(ARC28Event("change_online_status(int)", itob(node_index)))
     return
 end
 
 
+# permission: stake_manager
 @public()
 func move_stake(from_index: int, to_index: int, amount: int):
     bytes[32] user_address = Txn.Sender
@@ -278,31 +309,40 @@ func move_stake(from_index: int, to_index: int, amount: int):
         Amount: amount
         Fee: 0
     end
+    log(ARC28Event("move_stake(int,int,int)", itob(from_index), itob(to_index), itob(amount)))
     return
 end
 
 
 #### ---------------------------------------- Internal Functions ---------------------------------------------- ####
 
+# Using ascii in the global state key names is technically unnecessary but it looks nice and makes debugging easier.
+# It doesn't add significantly to the opcode cost as it is used sparingly.
+# NOTE: i MUST be < 10
 func ascii_digit(i: int) bytes:
     return extract(7, 1, itob(i + 48))
 end
 
 
 func update_rewards_and_rate(delta: int):
-	int algo_balance = full_balance()
-	int new_rewards = (algo_balance - delta) - app_global_get("algo_balance")
+    # delta is the additional balance transferred in this txn group that we want to ignore for now
+    # we are only interested in calculating rewards/donations since the last txn 
+	int algo_balance = full_balance() - delta
+	int new_rewards = algo_balance - app_global_get("algo_balance")
 	app_global_put("total_rewards", app_global_get("total_rewards") + new_rewards)
+    app_global_put("algo_balance", algo_balance)
+
+    # Calculate the amount of Algo owed to the protocol according to "protocol_fee"
 	int protocol_rewards = (new_rewards * app_global_get("protocol_fee")) / 100
+    # Convert the protocol fee to talgo immediately as it will stay staked and earn rewards
     int protocol_talgo = app_global_get("protocol_talgo")
 	int new_protocol_talgo = calc_talgo(protocol_rewards) 
     protocol_talgo = protocol_talgo + new_protocol_talgo
-    int minted_talgo = app_global_get("minted_talgo")
-    algo_balance = algo_balance - delta
-    minted_talgo = minted_talgo + new_protocol_talgo
     app_global_put("protocol_talgo", protocol_talgo)
+
+    int minted_talgo = app_global_get("minted_talgo")
+    minted_talgo = minted_talgo + new_protocol_talgo
     app_global_put("minted_talgo", minted_talgo)
-    app_global_put("algo_balance", algo_balance)
     if minted_talgo:
         # int rate = (algo_balance * RATE_SCALER) / minted_talgo
         # use wide math otherwise any algo_balance over approx 18M would cause an overflow
@@ -311,7 +351,6 @@ func update_rewards_and_rate(delta: int):
     else:
         app_global_put("rate", 1 * RATE_SCALER)
     end
-    log(concat("%i", itob(app_global_get("rate"))))
     return
 end
 
@@ -330,23 +369,19 @@ func calc_algo(talgo_amount: int) int:
 end
 
 
-func create_auxiliary_account(index: int):
-    bytes key = concat("account_", ascii_digit(index))
-
-    # 1. create application with program that rekeys to current app
+func create_auxiliary_account() bytes[32]:
+    # 1. create application with program that rekeys its account to current app and deletes itself
     inner_txn:
         TypeEnum: Appl
-        OnCompletion: NoOp
+        OnCompletion: DeleteApplication
         ApprovalProgram: AUX_PROGRAM
         ClearStateProgram: "\x0A\x81\x01"
-        GlobalNumUint: 1
         Fee: 0
     end
     int app_id = Itxn.CreatedApplicationID
 
     # 2. determine app address from the app id
-    bytes address = sha512_256(concat("appID", itob(app_id)))
-    app_global_put(key, address)
+    bytes[32] address = UncheckedCast(sha512_256(concat("appID", itob(app_id))), bytes[32])
 
     # 3. fund account with mbr algo
     inner_txn:
@@ -355,10 +390,11 @@ func create_auxiliary_account(index: int):
         Amount: 100_000
         Fee: 0
     end
-    return
+    return address
 end
 
-
+# Any public method that uses this function must have account references to accounts 1-4. 
+# 4 additional accounts were chosen so only a single app call would be required for mint/burn.
 func full_balance() int:
     int algo = 0
     algo = algo + balance(app_global_get("account_0"))
@@ -400,6 +436,7 @@ end
 
 
 func transfer_talgo(receiver: bytes[32], amount: int):
+    # Sender is always the Application Account
     inner_txn:
         TypeEnum: Axfer
         AssetReceiver: receiver
@@ -412,6 +449,7 @@ end
 
 
 func transfer_algo(receiver: bytes[32], amount: int):
+    # Send from the account with the highest balance
     int from_index = find_account_with_highest_balance()
     inner_txn:
         TypeEnum: Pay

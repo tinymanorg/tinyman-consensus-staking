@@ -11,6 +11,7 @@ from algosdk.account import generate_account
 from algosdk.encoding import decode_address, encode_address
 from algosdk.logic import get_application_address
 from algosdk.transaction import OnComplete
+from algosdk.constants import ZERO_ADDRESS
 from tinyman.utils import bytes_to_int, TransactionGroup, int_to_bytes
 
 from tests.constants import talgo_approval_program, talgo_clear_state_program
@@ -32,12 +33,6 @@ class TestSetup(BaseTestCase):
     def setUp(self):
         super().setUp()
         self.ledger.set_account_balance(self.user_address, int(1e16))
-
-    def dummy_block(self, timestamp=None):
-        if timestamp is None:
-            timestamp = self.ledger.next_timestamp
-        self.ledger.eval_transactions([], block_timestamp=timestamp)
-        self.ledger.next_timestamp = timestamp + 1
 
     def test_create_app(self):
         account_sk, account_address = generate_account()
@@ -67,32 +62,16 @@ class TestSetup(BaseTestCase):
             self.ledger.global_states[app_id],
             {
                 b'manager': decode_address(account_address),
-                b'node_manager_0': decode_address(account_address),
-                b'node_manager_1': decode_address(account_address),
-                b'node_manager_2': decode_address(account_address),
-                b'node_manager_3': decode_address(account_address),
-                b'node_manager_4': decode_address(account_address),
+                b'node_manager_0': decode_address(ZERO_ADDRESS),
+                b'node_manager_1': decode_address(ZERO_ADDRESS),
+                b'node_manager_2': decode_address(ZERO_ADDRESS),
+                b'node_manager_3': decode_address(ZERO_ADDRESS),
+                b'node_manager_4': decode_address(ZERO_ADDRESS),
                 b'fee_collector': decode_address(account_address),
                 b'stake_manager': decode_address(account_address),
                 b'protocol_fee': 10,
-                b'fee_balance': 0,
             }
         )
-
-        # logs = block[b'txns'][0][b'dt'][b'lg']
-        # events = decode_logs(logs, events=staking_events)
-        # self.assertEqual(len(events), 1)
-
-        # create_application_event = events[0]
-        # self.assertDictEqual(
-        #     create_application_event,
-        #     {
-        #         "event_name": "create_application",
-        #         "amm_app_id": self.amm_app_id,
-        #         "tiny_asset_id": self.tiny_asset_id,
-        #         "manager_address": account_address
-        #     }
-        # )
 
     def test_init(self):
         self.t_algo_client.init()
@@ -156,3 +135,27 @@ class TestSetup(BaseTestCase):
 
         self.t_algo_client.go_offline(node_index)
         print(self.ledger.get_raw_account(a))
+
+    def test_set_node_manager(self):
+        self.ledger.set_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+        self.t_algo_client.init()
+        self.t_algo_client.set_node_manager(0, self.user_address)
+
+
+    def test_move_stake(self):
+        self.ledger.set_global_state(self.app_id, {
+            "manager": decode_address(self.user_address),
+            "stake_manager": decode_address(self.user_address),
+        })
+        self.t_algo_client.init()
+        self.t_algo_client.mint(int(10e12))
+        self.t_algo_client.move_stake(0, 1, int(5e12))
+
+
+    def test_claim_protocol_rewards(self):
+        self.t_algo_client.init()
+        self.t_algo_client.mint(1_000_000)
+        self.ledger.add(self.application_address, 1_000_000)
+        self.t_algo_client.sync()
+        self.ledger.set_account_balance(self.app_creator_address, 0, asset_id=self.t_algo_client.get_global(b"talgo_asset_id"))
+        self.t_algo_client.claim_protocol_rewards()

@@ -166,3 +166,59 @@ class TAlgoClient(BaseClient):
             )
         ]
         return self._submit(transactions, additional_fees=1)
+
+    def set_node_manager(self, node_index, node_manager_address):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["set_node_manager", node_index, decode_address(node_manager_address)],
+                accounts=[
+                ],
+                foreign_assets=[]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=0)
+    
+
+    def move_stake(self, from_node_index, to_node_index, amount):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["move_stake", from_node_index, to_node_index, amount],
+                accounts=[
+                    encode_address(self.get_global(b"account_1")),
+                    encode_address(self.get_global(b"account_2")),
+                    encode_address(self.get_global(b"account_3")),
+                    encode_address(self.get_global(b"account_4")),
+                ],
+                foreign_assets=[]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=1)
+    
+    def claim_protocol_rewards(self):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["claim_protocol_rewards"],
+                accounts=[
+                   encode_address(self.get_global(b"fee_collector")),
+                ],
+                foreign_assets=[
+                    self.get_global(b"talgo_asset_id"),
+                ]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=1)

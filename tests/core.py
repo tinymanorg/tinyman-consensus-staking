@@ -58,6 +58,7 @@ class BaseTestCase(unittest.TestCase):
             {
                 b"manager": decode_address(app_creator_address),
                 b"node_manager_1": decode_address(app_creator_address),
+                b"fee_collector": decode_address(app_creator_address),
                 b"protocol_fee": 10,
             }
         )
