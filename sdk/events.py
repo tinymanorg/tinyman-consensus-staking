@@ -30,8 +30,16 @@ create_application_event = Event(
     args=[
         abi.Argument(arg_type="uint64", name="talgo_asset_id"),
         abi.Argument(arg_type="uint64", name="tiny_asset_id"),
+        abi.Argument(arg_type="uint64", name="vault_app_id"),
         abi.Argument(arg_type="address", name="manager_address"),
-        abi.Argument(arg_type="uint64", name="stalgo_asset_id"),
+    ]
+)
+
+
+init_event = Event(
+    name="event",
+    args=[
+        abi.Argument(arg_type="uint64", name="stalgo_asset_id")
     ]
 )
 

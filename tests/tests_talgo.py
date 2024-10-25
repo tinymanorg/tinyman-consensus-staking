@@ -1,11 +1,14 @@
 from base64 import b64decode
 from datetime import datetime
 import time
+import unittest
 import uuid
 from unittest.mock import ANY
 
 from algojig import print_logs
+from algojig import get_suggested_params
 from algojig.ledger import JigLedger
+from algojig import TealishProgram
 from algosdk import transaction
 from algosdk.account import generate_account
 from algosdk.encoding import decode_address, encode_address
@@ -13,26 +16,69 @@ from algosdk.logic import get_application_address
 from algosdk.transaction import OnComplete
 from algosdk.constants import ZERO_ADDRESS
 from tinyman.utils import bytes_to_int, TransactionGroup, int_to_bytes
+from tests.utils import JigAlgod
 
-from tests.constants import talgo_approval_program, talgo_clear_state_program
-from tests.core import BaseTestCase
-from tests.constants import APP_LOCAL_INTS, APP_LOCAL_BYTES, APP_GLOBAL_INTS, APP_GLOBAL_BYTES, EXTRA_PAGES
-
-
-MAY_1 = int(datetime(2024, 5, 1).timestamp())
-DAY = 86400
-WEEK = DAY * 7
+from sdk.talgo_client import TAlgoClient
 
 
-class TestSetup(BaseTestCase):
+APP_LOCAL_INTS = 0
+APP_LOCAL_BYTES = 0
+APP_GLOBAL_INTS = 16
+APP_GLOBAL_BYTES = 16
+EXTRA_PAGES = 1
+
+talgo_approval_program = TealishProgram('contracts/talgo/talgo.tl')
+talgo_clear_state_program = TealishProgram('contracts/talgo/clear_state.tl')
+
+
+class TestSetup(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.app_id = 2_000
+        cls.noop_app_id = 3_000
+
+        cls.app_creator_sk, cls.app_creator_address = generate_account()
+        cls.deposit_address = generate_account()[1]
+
+        cls.user_sk, cls.user_address = ("ckFZbhsmsdIuT/jJlAG9MWGXN6sYpq1X9OKVbsGFeOYBChEy71FWSsru0yawsDx1bWtJE2UdV5nolNL6tUEzmA==", "AEFBCMXPKFLEVSXO2MTLBMB4OVWWWSITMUOVPGPISTJPVNKBGOMKU54THY")
+        cls.sp = get_suggested_params()
 
     def setUp(self):
         super().setUp()
+        self.ledger = JigLedger()
+        self.ledger.set_account_balance(self.app_creator_address, 10_000_000)
+
+        self.application_address = get_application_address(self.app_id)
+        self.create_talgo_app(self.app_id, self.app_creator_address)
+
+        self.t_algo_client = TAlgoClient(JigAlgod(self.ledger), self.app_id, self.user_address, self.user_sk)
         self.ledger.set_account_balance(self.user_address, int(1e16))
+
+    def create_talgo_app(self, app_id, app_creator_address):
+        self.ledger.create_app(
+            app_id=app_id,
+            approval_program=talgo_approval_program,
+            creator=app_creator_address,
+            local_ints=APP_LOCAL_INTS,
+            local_bytes=APP_LOCAL_BYTES,
+            global_ints=APP_GLOBAL_INTS,
+            global_bytes=APP_GLOBAL_BYTES
+        )
+
+        self.ledger.set_global_state(
+            app_id,
+            {
+                b"manager": decode_address(app_creator_address),
+                b"node_manager_1": decode_address(app_creator_address),
+                b"fee_collector": decode_address(app_creator_address),
+                b"protocol_fee": 10,
+            }
+        )
+
+        if app_id not in self.ledger.boxes:
+            self.ledger.boxes[app_id] = {}
 
     def test_create_app(self):
         account_sk, account_address = generate_account()

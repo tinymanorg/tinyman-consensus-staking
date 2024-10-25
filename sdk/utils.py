@@ -104,7 +104,7 @@ class TealishBytes():
 
 
 def get_struct(name):
-    return Struct(**structs[name])
+    return Struct(name=name, **structs[name])
 
 
 def get_type(name):
