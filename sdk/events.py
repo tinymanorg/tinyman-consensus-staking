@@ -93,3 +93,18 @@ claim_rewards_event = Event(
         abi.Argument(arg_type="uint64", name="amount"),
     ]
 )
+
+
+restaking_events = [
+    reward_period_event,
+    user_state_event,
+    create_application_event,
+    init_event,
+    state_event,
+    user_state_event,
+    update_state_event,
+    update_user_state_event,
+    increase_stake_event,
+    decrease_stake_event,
+    claim_rewards_event
+]

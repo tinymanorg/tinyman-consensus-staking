@@ -12,11 +12,13 @@ from algosdk.encoding import decode_address, encode_address
 from algosdk.logic import get_application_address
 from algosdk.transaction import OnComplete
 
-from tinyman.utils import bytes_to_int, TransactionGroup, int_to_bytes
+from tinyman.utils import bytes_to_int, int_to_bytes, TransactionGroup
 
 from sdk.talgo_staking_client import TAlgoStakingClient
+from sdk.event import decode_logs
+from sdk.events import restaking_events
 
-from tests.constants import talgo_staking_approval_program, talgo_staking_clear_state_program, WEEK
+from tests.constants import talgo_staking_approval_program, talgo_staking_clear_state_program, WEEK, DAY
 from tests.core import BaseTestCase
 from tests.constants import APP_LOCAL_INTS, APP_LOCAL_BYTES, APP_GLOBAL_INTS, APP_GLOBAL_BYTES, EXTRA_PAGES
 
@@ -148,14 +150,53 @@ class TAlgoStakingTests(BaseTestCase):
 
         self.ledger.next_timestamp = now
         self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
-        self.t_algo_staking_client.increase_stake(100_000)
+        self.talgo_staking_client.increase_stake(100_000)
+
+        user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")
+        self.assertEqual(user_state.staked_amount, 100_000)
+        self.assertEqual(user_state.timestamp, now)
 
     def test_decrease_stake(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
         self.ledger.set_account_balance(self.application_address, 10_000_000)
         self.init_talgo_staking_app()
 
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        self.create_reward_period(start_timestamp=now)
+
+        self.simulate_user_voting_power()
+        self.simulate_user_stake(staked_amount=100_000, timestamp=now)
+
+        self.ledger.next_timestamp = now + WEEK
+        self.talgo_staking_client.decrease_stake(100_000)
+
+        user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")
+        self.assertEqual(user_state.staked_amount, 0)
+        self.assertEqual(user_state.timestamp, now + WEEK)
+
     def test_claim_rewards(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
         self.ledger.set_account_balance(self.application_address, 10_000_000)
         self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        self.create_reward_period(start_timestamp=now)
+
+        self.simulate_user_voting_power()
+        self.simulate_user_stake(staked_amount=100_000, timestamp=now)
+
+        self.ledger.next_timestamp = now + DAY
+        self.talgo_staking_client.claim_rewards()
+
+        block = self.ledger.last_block
+        block_txns = block[b"txns"]
+
+        claim_rewards_transaction = block_txns[0]
+        breakpoint()
+        # events = decode_logs(claim_rewards_transaction[b"dt"][b"lg"], restaking_events)
+        reward_transfer_itx = claim_rewards_transaction[b"dt"][b"itx"]
+
+        self.assertEqual(reward_transfer_itx[b"txn"][b"xaid"], self.tiny_asset_id)
+        self.assertTrue(reward_transfer_itx[b"txn"][b"amt"] > 0)
+
+        user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")

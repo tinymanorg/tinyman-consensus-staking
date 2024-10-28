@@ -218,12 +218,13 @@ class TAlgoStakingClient():
                     (0, user_state_box_name),
                     (0, self.get_reward_period_box_name(current_period_index))
                 ],
+                foreign_assets=[self.talgo_asset_id, self.stalgo_asset_id],
             )
         ]
 
-        return self._submit(transactions)
+        return self._submit(transactions, additional_fees=2)
 
-    def claim_rewards(self, amount: int):
+    def claim_rewards(self):
         sp = self.get_suggested_params()
         current_period_index = self.get_global(CURRENT_PERIOD_INDEX_KEY)
         user_state_box_name = self.get_user_state_box_name(self.user_address)
@@ -235,6 +236,7 @@ class TAlgoStakingClient():
                 sp=sp,
                 index=self.app_id,
                 app_args=["claim_rewards"],
+                foreign_assets=[self.tiny_asset_id],
                 boxes=[
                     (0, user_state_box_name),
                     (0, self.get_reward_period_box_name(current_period_index))
@@ -242,4 +244,4 @@ class TAlgoStakingClient():
             )
         ]
 
-        return self._submit(transactions)
+        return self._submit(transactions, additional_fees=1)

@@ -69,7 +69,7 @@ class BaseTestCase(unittest.TestCase):
         self.stalgo_asset_id = 1112131
 
         self.algod = JigAlgod(self.ledger)
-        self.t_algo_staking_client = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.user_address, self.user_sk)
+        self.talgo_staking_client = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.user_address, self.user_sk)
 
     def create_talgo_staking_app(self, app_id, app_creator_address):
         self.ledger.create_app(
@@ -130,7 +130,7 @@ class BaseTestCase(unittest.TestCase):
         reward_period.start_timestamp = start_timestamp
         reward_period.end_timestamp = end_timestamp
 
-        self.ledger.boxes[self.app_id][self.t_algo_staking_client.get_reward_period_box_name(0)] = reward_period
+        self.ledger.boxes[self.app_id][self.talgo_staking_client.get_reward_period_box_name(0)] = reward_period
         self.ledger.global_states[self.app_id][b"period_count"] = 1
         self.ledger.global_states[self.app_id][b"current_period_index"] = 0
 
@@ -141,4 +141,28 @@ class BaseTestCase(unittest.TestCase):
         lock_end_time = lock_end_time or (now + 125798400)
         account_state = int_to_bytes(locked_amount) + int_to_bytes(lock_end_time) + int_to_bytes(1) + int_to_bytes(0)
 
-        self.ledger.set_box(self.app_id, key=decode_address(account_address), value=account_state)
+        self.ledger.set_box(self.vault_app_id, key=decode_address(account_address), value=account_state)
+
+    def simulate_user_stake(self, account_address=None, staked_amount=100_000, timestamp=None):
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+
+        account_address = account_address or self.user_address
+        timestamp = timestamp or now
+
+        user_state = UserState()
+        user_state.staked_amount = staked_amount
+        user_state.accumulated_rewards_per_unit_at_last_update = 0
+        user_state.accumulated_rewards = 0
+        user_state.timestamp = timestamp
+
+        self.ledger.set_box(self.app_id, key=decode_address(account_address), value=user_state._data)
+        self.ledger.set_account_balance(self.application_address, staked_amount, self.talgo_asset_id)
+        self.ledger.set_account_balance(account_address, 0, self.talgo_asset_id)        
+        self.ledger.set_account_balance(account_address, staked_amount, self.stalgo_asset_id)
+
+        # Global State Updates
+        self.ledger.global_states[self.app_id][b"total_staked_amount"] = self.ledger.global_states[self.app_id].get(b"total_staked_amount", 0) + staked_amount
+        self.ledger.global_states[self.app_id][b"total_staker_count"] = self.ledger.global_states[self.app_id].get(b"total_staker_count", 0) + 1
+
+        last_update_timestamp = self.ledger.global_states[self.app_id].get(b"last_update_timestamp", 0)
+        self.ledger.global_states[self.app_id][b"last_update_timestamp"] = timestamp if timestamp > last_update_timestamp else last_update_timestamp
