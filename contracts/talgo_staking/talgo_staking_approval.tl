@@ -154,11 +154,12 @@ func set_reward_rate(total_reward_amount: int, end_timestamp: int):
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, end_timestamp)
 
-    log(ARC28Event("set_reward_rate(uint64,uint64,uint64,uint64)", itob(total_reward_amount), itob(Global.LatestTimestamp), itob(end_timestamp)))
+    log(ARC28Event("set_reward_rate(uint64,uint64,uint64,uint64)", itob(total_reward_amount), itob(Global.LatestTimestamp), itob(end_timestamp), itob(reward_rate_per_time)))
     return
 end
 
 
+# Description: If current rate expiration is reached, set it to 0.
 # Permission: anyone.
 @public()
 func apply_rate_change():
@@ -206,6 +207,8 @@ func get_reward_rate_per_time() int:
 end
 
 
+# Description: Accumulate rewards. Fails if there is a pending rate change.
+# Permission: anyone.
 @public()
 func update_state(timestamp: int):
     int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY)
@@ -229,6 +232,7 @@ func update_state(timestamp: int):
 end
 
 
+# Description: Accumulate user rewards. Should be called after `update_state`.
 func update_user_state(user_address: bytes[32]):
     int rewards_per_unit_delta
     int rewards_delta
