@@ -30,9 +30,6 @@ class TAlgoStakingClient(BaseClient):
         self.add_key(user_address, user_sk)
         self.current_timestamp = None
 
-    def get_reward_period_box_name(self, index: int):
-        return int_to_bytes(index)
-
     def set_reward_rate(self, total_reward_amount: int, end_timestamp: int):
         sp = self.get_suggested_params()
 
@@ -90,7 +87,6 @@ class TAlgoStakingClient(BaseClient):
 
     def increase_stake(self, amount: int):
         sp = self.get_suggested_params()
-        current_period_index = self.get_global(CURRENT_PERIOD_INDEX_KEY)
 
         user_state_box_name = self.get_user_state_box_name(self.user_address)
         new_boxes = {}
@@ -129,7 +125,6 @@ class TAlgoStakingClient(BaseClient):
                 foreign_assets=[self.stalgo_asset_id],
                 boxes=[
                     (0, user_state_box_name),
-                    (0, self.get_reward_period_box_name(current_period_index)),
                     (self.vault_app_id, user_state_box_name),
                 ],
             )
@@ -139,7 +134,6 @@ class TAlgoStakingClient(BaseClient):
     
     def decrease_stake(self, amount: int):
         sp = self.get_suggested_params()
-        current_period_index = self.get_global(CURRENT_PERIOD_INDEX_KEY)
         user_state_box_name = self.get_user_state_box_name(self.user_address)
 
         transactions = [
@@ -151,7 +145,6 @@ class TAlgoStakingClient(BaseClient):
                 app_args=["decrease_stake", amount],
                 boxes=[
                     (0, user_state_box_name),
-                    (0, self.get_reward_period_box_name(current_period_index))
                 ],
                 foreign_assets=[self.talgo_asset_id, self.stalgo_asset_id],
             )
@@ -161,7 +154,6 @@ class TAlgoStakingClient(BaseClient):
 
     def claim_rewards(self):
         sp = self.get_suggested_params()
-        current_period_index = self.get_global(CURRENT_PERIOD_INDEX_KEY)
         user_state_box_name = self.get_user_state_box_name(self.user_address)
 
         transactions = [
@@ -174,7 +166,6 @@ class TAlgoStakingClient(BaseClient):
                 foreign_assets=[self.tiny_asset_id],
                 boxes=[
                     (0, user_state_box_name),
-                    (0, self.get_reward_period_box_name(current_period_index))
                 ],
             )
         ]
