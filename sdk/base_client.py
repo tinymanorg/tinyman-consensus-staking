@@ -7,6 +7,7 @@ from algosdk.encoding import decode_address, encode_address
 from algosdk.logic import get_application_address
 from algosdk.account import generate_account
 
+from sdk.utils import get_struct, get_box_costs
 
 class BaseClient():
     def __init__(self, algod, app_id, user_address, user_sk) -> None:

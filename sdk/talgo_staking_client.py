@@ -28,6 +28,7 @@ class TAlgoStakingClient(BaseClient):
         self.keys = {}
         self.add_key(user_address, user_sk)
         self.current_timestamp = None
+        self.simulate = False
 
     def set_reward_rate(self, total_reward_amount: int, end_timestamp: int):
         sp = self.get_suggested_params()
@@ -82,7 +83,7 @@ class TAlgoStakingClient(BaseClient):
 
         user_state_box_name = self.get_user_state_box_name(self.user_address)
         new_boxes = {}
-        if self.box_exists(user_state_box_name):
+        if not self.box_exists(user_state_box_name):
             new_boxes[user_state_box_name] = UserState
 
         transactions = [

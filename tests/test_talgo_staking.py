@@ -14,6 +14,7 @@ from algosdk.transaction import OnComplete
 
 from tinyman.utils import bytes_to_int, int_to_bytes, TransactionGroup
 
+from sdk.constants import *
 from sdk.talgo_staking_client import TAlgoStakingClient
 from sdk.event import decode_logs
 from sdk.events import restaking_events
@@ -66,11 +67,14 @@ class TAlgoStakingTests(BaseTestCase):
         self.assertDictEqual(
             self.ledger.global_states[app_id],
             {
-                b"talgo_asset_id": self.talgo_asset_id,
-                b"tiny_asset_id": self.tiny_asset_id,
-                b"vault_app_id": self.vault_app_id,
-                b"manager": decode_address(self.manager_address),
-                b"tiny_power_threshold": 1000,
+                TALGO_ASSET_ID_KEY: self.talgo_asset_id,
+                TINY_ASSET_ID_KEY: self.tiny_asset_id,
+                VAULT_APP_ID_KEY: self.vault_app_id,
+                MANAGER_KEY: decode_address(self.manager_address),
+                TINY_POWER_THRESHOLD_KEY: 1000,
+                CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
+                CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
+                LAST_CURRENT_REWARD_RATE_PER_TIME_KEY: 0
             }
         )
 
@@ -108,16 +112,19 @@ class TAlgoStakingTests(BaseTestCase):
         self.assertDictEqual(
             self.ledger.global_states[self.app_id],
             {
-                b"stalgo_asset_id": stalgo_asset_id,
-                b"talgo_asset_id": self.talgo_asset_id,
-                b"tiny_asset_id": self.tiny_asset_id,
-                b"vault_app_id": self.vault_app_id,
-                b"manager": decode_address(self.manager_address),
-                b"tiny_power_threshold": 1000,
+                STALGO_ASSET_ID_KEY: stalgo_asset_id,
+                TALGO_ASSET_ID_KEY: self.talgo_asset_id,
+                TINY_ASSET_ID_KEY: self.tiny_asset_id,
+                VAULT_APP_ID_KEY: self.vault_app_id,
+                MANAGER_KEY: decode_address(self.manager_address),
+                TINY_POWER_THRESHOLD_KEY: 1000,
+                CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
+                CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
+                LAST_CURRENT_REWARD_RATE_PER_TIME_KEY: 0
             }
         )
 
-    def test_create_reward_period(self):
+    def test_set_reward_rate(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
         self.ledger.set_account_balance(self.application_address, 10_000_000)
         self.init_talgo_staking_app()
@@ -126,7 +133,7 @@ class TAlgoStakingTests(BaseTestCase):
 
         start_timestamp = int(datetime(2025, 3, 24, tzinfo=timezone.utc).timestamp())
         end_timestamp = start_timestamp + WEEK
-        client_for_manager.create_reward_period(1_000_000, start_timestamp, end_timestamp)
+        client_for_manager.set_reward_rate(1_000_000, end_timestamp)
 
     def test_set_tiny_power_threshold(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -144,7 +151,7 @@ class TAlgoStakingTests(BaseTestCase):
         self.init_talgo_staking_app()
 
         now = int(datetime.now(tz=timezone.utc).timestamp())
-        self.create_reward_period(start_timestamp=now)
+        self.set_reward_rate(start_timestamp=now)
 
         self.simulate_user_voting_power()
 
@@ -162,7 +169,7 @@ class TAlgoStakingTests(BaseTestCase):
         self.init_talgo_staking_app()
 
         now = int(datetime.now(tz=timezone.utc).timestamp())
-        self.create_reward_period(start_timestamp=now)
+        self.set_reward_rate(start_timestamp=now)
 
         self.simulate_user_voting_power()
         self.simulate_user_stake(staked_amount=100_000, timestamp=now)
@@ -180,7 +187,7 @@ class TAlgoStakingTests(BaseTestCase):
         self.init_talgo_staking_app()
 
         now = int(datetime.now(tz=timezone.utc).timestamp())
-        self.create_reward_period(start_timestamp=now)
+        self.set_reward_rate(start_timestamp=now)
 
         self.simulate_user_voting_power()
         self.simulate_user_stake(staked_amount=100_000, timestamp=now)

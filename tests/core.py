@@ -8,7 +8,8 @@ from algojig.ledger import JigLedger
 
 from tinyman.utils import int_to_bytes
 
-from sdk.talgo_staking_client import TAlgoStakingClient, RewardPeriod, UserState
+from sdk.constants import *
+from sdk.talgo_staking_client import TAlgoStakingClient, UserState
 
 from tests.constants import *
 from tests.utils import JigAlgod
@@ -85,11 +86,14 @@ class BaseTestCase(unittest.TestCase):
         self.ledger.set_global_state(
             app_id,
             {
-                b"talgo_asset_id": self.talgo_asset_id,
-                b"tiny_asset_id": self.tiny_asset_id,
-                b"vault_app_id": self.vault_app_id,
-                b"manager": decode_address(self.manager_address),
-                b"tiny_power_threshold": 1000,
+                TALGO_ASSET_ID_KEY: self.talgo_asset_id,
+                TINY_ASSET_ID_KEY: self.tiny_asset_id,
+                VAULT_APP_ID_KEY: self.vault_app_id,
+                MANAGER_KEY: decode_address(self.manager_address),
+                TINY_POWER_THRESHOLD_KEY: 1000,
+                CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
+                CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
+                LAST_CURRENT_REWARD_RATE_PER_TIME_KEY: 0
             }
         )
 
@@ -120,19 +124,17 @@ class BaseTestCase(unittest.TestCase):
         )
         self.ledger.global_states[self.app_id][b"stalgo_asset_id"] = self.stalgo_asset_id
 
-    def create_reward_period(self, total_reward_amount=10_000_000, start_timestamp=None, end_timestamp=None):
+    def set_reward_rate(self, total_reward_amount=10_000_000, start_timestamp=None, end_timestamp=None):
         if not (start_timestamp and end_timestamp):
-            start_timestamp = start_timestamp or int(datetime(2025, 3, 25, tzinfo=timezone.utc).timestamp())
+            start_timestamp = start_timestamp or int(datetime.now(tz=timezone.utc).timestamp())
             end_timestamp = start_timestamp + WEEK
 
-        reward_period = RewardPeriod()
-        reward_period.total_reward_amount = total_reward_amount
-        reward_period.start_timestamp = start_timestamp
-        reward_period.end_timestamp = end_timestamp
+        duration = int(end_timestamp - start_timestamp)
+        reward_rate_per_time = int(total_reward_amount / duration)
 
-        self.ledger.boxes[self.app_id][self.talgo_staking_client.get_reward_period_box_name(0)] = reward_period
-        self.ledger.global_states[self.app_id][b"period_count"] = 1
-        self.ledger.global_states[self.app_id][b"current_period_index"] = 0
+        self.ledger.global_states[self.app_id][LAST_CURRENT_REWARD_RATE_PER_TIME_KEY] = self.ledger.global_states[self.app_id].get(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+        self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_KEY] = reward_rate_per_time
+        self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY] = end_timestamp
 
     def simulate_user_voting_power(self, account_address=None, locked_amount=1000, lock_end_time=None):
         now = int(datetime.now(tz=timezone.utc).timestamp())
