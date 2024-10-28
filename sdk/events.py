@@ -3,16 +3,6 @@ from algosdk import abi
 from sdk.event import Event  # TODO: This dependency is copied from sdk.
 
 
-reward_period_event = Event(
-    name="reward_period",
-    args=[
-        abi.Argument(arg_type="uint64", name="total_reward_amount"),
-        abi.Argument(arg_type="uint64", name="start_timestamp"),
-        abi.Argument(arg_type="uint64", name="end_timestamp"),
-    ]
-)
-
-
 user_state_event = Event(
     name="user_state",
     args=[
@@ -58,7 +48,7 @@ state_event = Event(
 update_state_event = Event(
     name="update_state",
     args=[
-        abi.Argument(arg_type="uint64", name="period_index"),
+        abi.Argument(arg_type="uint64", name="timestamp"),
     ]
 )
 
@@ -67,6 +57,25 @@ update_user_state_event = Event(
     name="update_user_state",
     args=[
         abi.Argument(arg_type="address", name="user_address"),
+    ]
+)
+
+
+set_reward_rate_event = Event(
+    name="set_reward_rate",
+    args=[
+        abi.Argument(arg_type="uint64", name="total_reward_amount"),
+        abi.Argument(arg_type="uint64", name="start_timestamp"),
+        abi.Argument(arg_type="uint64", name="end_timestamp"),
+        abi.Argument(arg_type="uint64", name="current_reward_rate_per_time"),
+    ]
+)
+
+
+apply_rate_change_event = Event(
+    name="apply_rate_change",
+    args=[
+        abi.Argument(arg_type="uint64", name="current_reward_rate_per_time"),
     ]
 )
 
@@ -96,13 +105,13 @@ claim_rewards_event = Event(
 
 
 restaking_events = [
-    reward_period_event,
-    user_state_event,
     create_application_event,
     init_event,
     state_event,
-    user_state_event,
+    set_reward_rate_event,
+    apply_rate_change_event,
     update_state_event,
+    user_state_event,
     update_user_state_event,
     increase_stake_event,
     decrease_stake_event,
