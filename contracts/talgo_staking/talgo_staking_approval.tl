@@ -17,7 +17,6 @@ const bytes TINY_ASSET_ID_KEY = "tiny_asset_id"
 const bytes TALGO_ASSET_ID_KEY = "talgo_asset_id"
 const bytes STALGO_ASSET_ID_KEY = "stalgo_asset_id"
 
-const bytes DEFAULT_REWARD_RATE_PER_TIME_KEY = "default_reward_rate_per_time"
 const bytes LAST_CURRENT_REWARD_RATE_PER_TIME_KEY = "last_current_reward_rate_per_time"
 const bytes CURRENT_REWARD_RATE_PER_TIME_KEY = "current_reward_rate_per_time"
 const bytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY = "current_reward_rate_per_time_end_timestamp"
@@ -41,7 +40,6 @@ router:
     update_application
     init
     set_tiny_power_threshold
-    set_default_rate
     set_reward_rate
     apply_rate_change
     update_state
@@ -69,7 +67,6 @@ func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: i
     app_global_put(MANAGER_KEY, manager_address)
     app_global_put(TINY_POWER_THRESHOLD_KEY, 1000)
 
-    app_global_put(DEFAULT_REWARD_RATE_PER_TIME_KEY, 0)
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
     app_global_put(LAST_CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
@@ -125,23 +122,6 @@ end
 
 # Permission: manager
 @public()
-func set_default_rate(reward_rate_per_time: int):
-    update_state(Global.LatestTimestamp)
-
-    int default_reward_rate_per_time = app_global_get(DEFAULT_REWARD_RATE_PER_TIME_KEY)
-    if default_reward_rate_per_time:
-        assert(reward_rate_per_time < (default_reward_rate_per_time + ((default_reward_rate_per_time * 100) / MAX_RATE_INCREMENT_PERCENTAGE)))
-    end
-
-    app_global_put(DEFAULT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
-
-    log(ARC28Event("set_default_rate(uint64,uint64)", itob(reward_rate_per_time), itob(Global.LatestTimestamp)))
-    return
-end
-
-
-# Permission: manager
-@public()
 func set_reward_rate(total_reward_amount: int, end_timestamp: int):
     assert(Txn.Sender == app_global_get(MANAGER_KEY))
 
@@ -158,16 +138,17 @@ func set_reward_rate(total_reward_amount: int, end_timestamp: int):
     int last_current_reward_rate_per_time = app_global_get(LAST_CURRENT_REWARD_RATE_PER_TIME_KEY)
     int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
 
-    int reward_rate_per_time
+    int max_rate_per_time
     if last_current_reward_rate_per_time < current_reward_rate_per_time:
-        reward_rate_per_time = current_reward_rate_per_time
+        max_rate_per_time = current_reward_rate_per_time
     else:
-        reward_rate_per_time = last_current_reward_rate_per_time
+        max_rate_per_time = last_current_reward_rate_per_time
     end
+    max_rate_per_time = max_rate_per_time + ((max_rate_per_time * 100) / MAX_RATE_INCREMENT_PERCENTAGE)
 
     # Check is disabled for initialization. Use the saved value if it's bigger.
-    if reward_rate_per_time:
-        assert(reward_rate_per_time < (reward_rate_per_time + ((reward_rate_per_time * 100) / MAX_RATE_INCREMENT_PERCENTAGE)))
+    if max_rate_per_time:
+        assert(reward_rate_per_time < max_rate_per_time)
     end
 
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
@@ -183,7 +164,6 @@ end
 func apply_rate_change():
     int reward_rate_per_time
 
-    int default_reward_rate_per_time = app_global_get(DEFAULT_REWARD_RATE_PER_TIME_KEY)
     int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
     int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY)
 
@@ -199,16 +179,15 @@ func apply_rate_change():
         # Save the CURRENT_REWARD_RATE_PER_TIME for increment check in `set_reward_rate`.
         app_global_put(LAST_CURRENT_REWARD_RATE_PER_TIME_KEY, current_reward_rate_per_time)
 
-        # Update the CURRENT_REWARD_RATE_PER_TIME with default.
+        # Update the CURRENT_REWARD_RATE_PER_TIME to 0.
         app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
-        app_global_put(CURRENT_REWARD_RATE_PER_TIME, default_reward_rate_per_time)
+        app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
 
         # TODO: This might not be needed. Discuss.
         update_state(Global.LatestTimestamp)
 
-        reward_rate_per_time = default_reward_rate_per_time
-
-        log(ARC28Event("apply_rate_change(uint64)", reward_rate_per_time))
+        reward_rate_per_time = 0
+        log(ARC28Event("apply_rate_change(uint64)", itob(reward_rate_per_time)))
     end
 
     return

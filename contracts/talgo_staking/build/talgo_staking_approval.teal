@@ -11,7 +11,7 @@
 #define TALGO_ASSET_ID_KEY "talgo_asset_id"
 #define STALGO_ASSET_ID_KEY "stalgo_asset_id"
 
-#define DEFAULT_REWARD_RATE_PER_TIME_KEY "default_reward_rate_per_time"
+#define LAST_CURRENT_REWARD_RATE_PER_TIME_KEY "last_current_reward_rate_per_time"
 #define CURRENT_REWARD_RATE_PER_TIME_KEY "current_reward_rate_per_time"
 #define CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY "current_reward_rate_per_time_end_timestamp"
 #define MAX_RATE_INCREMENT_PERCENTAGE 10
@@ -34,7 +34,6 @@ pushbytes "create_application"
 pushbytes "update_application"
 pushbytes "init"
 pushbytes "set_tiny_power_threshold"
-pushbytes "set_default_rate"
 pushbytes "set_reward_rate"
 pushbytes "apply_rate_change"
 pushbytes "update_state"
@@ -42,7 +41,7 @@ pushbytes "increase_stake"
 pushbytes "decrease_stake"
 pushbytes "claim_rewards"
 txna ApplicationArgs 0
-match route_create_application route_update_application route_init route_set_tiny_power_threshold route_set_default_rate route_set_reward_rate route_apply_rate_change route_update_state route_increase_stake route_decrease_stake route_claim_rewards
+match route_create_application route_update_application route_init route_set_tiny_power_threshold route_set_reward_rate route_apply_rate_change route_update_state route_increase_stake route_decrease_stake route_claim_rewards
 err                                                         // unexpected value
 route_create_application:
     txn ApplicationID; pushint 0; ==; assert                // ApplicationID == 0
@@ -64,11 +63,6 @@ route_set_tiny_power_threshold:
     txn OnCompletion; pushint 0; ==; assert                 // assert OnCompletion == NoOp
     txna ApplicationArgs 1; btoi 
     callsub __func__set_tiny_power_threshold
-    pushint 1; return
-route_set_default_rate:
-    txn OnCompletion; pushint 0; ==; assert                 // assert OnCompletion == NoOp
-    txna ApplicationArgs 1; btoi 
-    callsub __func__set_default_rate
     pushint 1; return
 route_set_reward_rate:
     txn OnCompletion; pushint 0; ==; assert                 // assert OnCompletion == NoOp
@@ -102,64 +96,64 @@ route_claim_rewards:
 
 
 // TODO: This should be removed.
-// tl:55: func update_application():
+// tl:54: func update_application():
 __func__update_application:
-    // tl:56: bytes manager_address = app_global_get(MANAGER_KEY) [slot 1]
+    // tl:55: bytes manager_address = app_global_get(MANAGER_KEY) [slot 1]
     pushbytes MANAGER_KEY                                   // "manager"
     app_global_get
     store 1                                                 // manager_address
-    // tl:57: assert(Txn.Sender == manager_address)
+    // tl:56: assert(Txn.Sender == manager_address)
     txn Sender
     load 1                                                  // manager_address
     ==
     assert
-    // tl:58: return
+    // tl:57: return
     retsub
 
 
 // Permission: anyone
-// tl:64: func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: int, manager_address: bytes[32]):
+// tl:63: func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: int, manager_address: bytes[32]):
 __func__create_application:
     store 2                                                 // manager_address [bytes[32]]
     store 3                                                 // vault_app_id [int]
     store 4                                                 // tiny_asset_id [int]
     store 5                                                 // talgo_asset_id [int]
-    // tl:65: app_global_put(TALGO_ASSET_ID_KEY, talgo_asset_id)
+    // tl:64: app_global_put(TALGO_ASSET_ID_KEY, talgo_asset_id)
     pushbytes TALGO_ASSET_ID_KEY                            // "talgo_asset_id"
     load 5                                                  // talgo_asset_id
     app_global_put
-    // tl:66: app_global_put(TINY_ASSET_ID_KEY, tiny_asset_id)
+    // tl:65: app_global_put(TINY_ASSET_ID_KEY, tiny_asset_id)
     pushbytes TINY_ASSET_ID_KEY                             // "tiny_asset_id"
     load 4                                                  // tiny_asset_id
     app_global_put
-    // tl:67: app_global_put(VAULT_APP_ID_KEY, vault_app_id)
+    // tl:66: app_global_put(VAULT_APP_ID_KEY, vault_app_id)
     pushbytes VAULT_APP_ID_KEY                              // "vault_app_id"
     load 3                                                  // vault_app_id
     app_global_put
-    // tl:68: app_global_put(MANAGER_KEY, manager_address)
+    // tl:67: app_global_put(MANAGER_KEY, manager_address)
     pushbytes MANAGER_KEY                                   // "manager"
     load 2                                                  // manager_address
     app_global_put
-    // tl:69: app_global_put(TINY_POWER_THRESHOLD_KEY, 1000)
+    // tl:68: app_global_put(TINY_POWER_THRESHOLD_KEY, 1000)
     pushbytes TINY_POWER_THRESHOLD_KEY                      // "tiny_power_threshold"
     pushint 1000
     app_global_put
     
-    // tl:71: app_global_put(DEFAULT_REWARD_RATE_PER_TIME_KEY, 0)
-    pushbytes DEFAULT_REWARD_RATE_PER_TIME_KEY              // "default_reward_rate_per_time"
-    pushint 0
-    app_global_put
-    // tl:72: app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+    // tl:70: app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
     pushbytes CURRENT_REWARD_RATE_PER_TIME_KEY              // "current_reward_rate_per_time"
     pushint 0
     app_global_put
-    // tl:73: app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, 0)
+    // tl:71: app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
     pushbytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY // "current_reward_rate_per_time_end_timestamp"
+    pushint MAX_UINT64                                      // 18446744073709551615
+    app_global_put
+    // tl:72: app_global_put(LAST_CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+    pushbytes LAST_CURRENT_REWARD_RATE_PER_TIME_KEY         // "last_current_reward_rate_per_time"
     pushint 0
     app_global_put
     
     // create_application(talgo_asset_id, tiny_asset_id, manager_address, stalgo_asset_id)
-    // tl:76: log(ARC28Event("create_application(uint64,uint64,uint64,address)", itob(talgo_asset_id), itob(tiny_asset_id), itob(vault_app_id), manager_address))
+    // tl:75: log(ARC28Event("create_application(uint64,uint64,uint64,address)", itob(talgo_asset_id), itob(tiny_asset_id), itob(vault_app_id), manager_address))
     pushbytes 0xe7f0b40a                                    // SHA512_256("create_application(uint64,uint64,uint64,address)")[:4]
     load 5                                                  // talgo_asset_id
     itob
@@ -173,1041 +167,985 @@ __func__create_application:
     concat
     concat
     log
-    // tl:77: return
+    // tl:76: return
     retsub
 
 
 // Permission: manager
-// tl:83: func init():
+// tl:82: func init():
 __func__init:
-    // tl:84: assert(Txn.Sender == app_global_get(MANAGER_KEY))
+    // tl:83: assert(Txn.Sender == app_global_get(MANAGER_KEY))
     txn Sender
     pushbytes MANAGER_KEY                                   // "manager"
     app_global_get
     ==
     assert
-    // tl:85: assert(!app_global_get(STALGO_ASSET_ID_KEY))
+    // tl:84: assert(!app_global_get(STALGO_ASSET_ID_KEY))
     pushbytes STALGO_ASSET_ID_KEY                           // "stalgo_asset_id"
     app_global_get
     !
     assert
     
-    // tl:87: opt_in_to_asset(app_global_get(TINY_ASSET_ID_KEY))
+    // tl:86: opt_in_to_asset(app_global_get(TINY_ASSET_ID_KEY))
     pushbytes TINY_ASSET_ID_KEY                             // "tiny_asset_id"
     app_global_get
     callsub __func__opt_in_to_asset
-    // tl:88: opt_in_to_asset(app_global_get(TALGO_ASSET_ID_KEY))
+    // tl:87: opt_in_to_asset(app_global_get(TALGO_ASSET_ID_KEY))
     pushbytes TALGO_ASSET_ID_KEY                            // "talgo_asset_id"
     app_global_get
     callsub __func__opt_in_to_asset
     
-    // tl:90: inner_txn:
+    // tl:89: inner_txn:
     itxn_begin
-        // tl:91: TypeEnum: Acfg
+        // tl:90: TypeEnum: Acfg
         pushint 3                                           // Acfg
         itxn_field TypeEnum
-        // tl:92: Sender: Global.CurrentApplicationAddress
+        // tl:91: Sender: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field Sender
-        // tl:93: ConfigAssetUnitName: "STALGO"
+        // tl:92: ConfigAssetUnitName: "STALGO"
         pushbytes "STALGO"
         itxn_field ConfigAssetUnitName
-        // tl:94: ConfigAssetName: "Staked tALGO"
+        // tl:93: ConfigAssetName: "Staked tALGO"
         pushbytes "Staked tALGO"
         itxn_field ConfigAssetName
-        // tl:95: ConfigAssetTotal: ALGO_TOTAL_SUPPLY
+        // tl:94: ConfigAssetTotal: ALGO_TOTAL_SUPPLY
         pushint ALGO_TOTAL_SUPPLY                           // 10000000000000000
         itxn_field ConfigAssetTotal
-        // tl:96: ConfigAssetDecimals: 6
+        // tl:95: ConfigAssetDecimals: 6
         pushint 6
         itxn_field ConfigAssetDecimals
-        // tl:97: ConfigAssetURL: "https://tinyman.org"
+        // tl:96: ConfigAssetURL: "https://tinyman.org"
         pushbytes "https://tinyman.org"
         itxn_field ConfigAssetURL
-        // tl:98: ConfigAssetReserve: Global.CurrentApplicationAddress
+        // tl:97: ConfigAssetReserve: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field ConfigAssetReserve
-        // tl:99: ConfigAssetClawback: Global.CurrentApplicationAddress
+        // tl:98: ConfigAssetClawback: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field ConfigAssetClawback
-        // tl:100: ConfigAssetFreeze: Global.CurrentApplicationAddress
+        // tl:99: ConfigAssetFreeze: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field ConfigAssetFreeze
-        // tl:101: ConfigAssetDefaultFrozen: 1
+        // tl:100: ConfigAssetDefaultFrozen: 1
         pushint 1
         itxn_field ConfigAssetDefaultFrozen
-        // tl:102: Fee: 0
+        // tl:101: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
     
-    // tl:105: app_global_put(STALGO_ASSET_ID_KEY, Itxn.CreatedAssetID)
+    // tl:104: app_global_put(STALGO_ASSET_ID_KEY, Itxn.CreatedAssetID)
     pushbytes STALGO_ASSET_ID_KEY                           // "stalgo_asset_id"
     itxn CreatedAssetID
     app_global_put
     
-    // tl:107: log(ARC28Event("init(uint64)", itob(app_global_get("STALGO_ASSET_ID_KEY"))))
+    // tl:106: log(ARC28Event("init(uint64)", itob(app_global_get("STALGO_ASSET_ID_KEY"))))
     pushbytes 0x934a0b07                                    // SHA512_256("init(uint64)")[:4]
     pushbytes "STALGO_ASSET_ID_KEY"
     app_global_get
     itob
     concat
     log
-    // tl:108: return
+    // tl:107: return
     retsub
 
 
 // Permission: manager
-// tl:114: func set_tiny_power_threshold(threshold: int):
+// tl:113: func set_tiny_power_threshold(threshold: int):
 __func__set_tiny_power_threshold:
     store 6                                                 // threshold [int]
-    // tl:115: assert(Txn.Sender == app_global_get(MANAGER_KEY))
+    // tl:114: assert(Txn.Sender == app_global_get(MANAGER_KEY))
     txn Sender
     pushbytes MANAGER_KEY                                   // "manager"
     app_global_get
     ==
     assert
     
-    // tl:117: app_global_put(TINY_POWER_THRESHOLD_KEY, threshold)
+    // tl:116: app_global_put(TINY_POWER_THRESHOLD_KEY, threshold)
     pushbytes TINY_POWER_THRESHOLD_KEY                      // "tiny_power_threshold"
     load 6                                                  // threshold
     app_global_put
     
-    // tl:119: log(ARC28Event("set_tiny_power_threshold(uint64)", itob(threshold)))
+    // tl:118: log(ARC28Event("set_tiny_power_threshold(uint64)", itob(threshold)))
     pushbytes 0xfcde7563                                    // SHA512_256("set_tiny_power_threshold(uint64)")[:4]
     load 6                                                  // threshold
     itob
     concat
     log
-    // tl:120: return
+    // tl:119: return
     retsub
 
 
 // Permission: manager
-// tl:126: func set_default_rate(reward_rate_per_time: int):
-__func__set_default_rate:
-    store 7                                                 // reward_rate_per_time [int]
-    // tl:127: update_state(Global.LatestTimestamp)
-    global LatestTimestamp
-    callsub __func__update_state
-    
-    // tl:129: int default_reward_rate_per_time = app_global_get(DEFAULT_REWARD_RATE_PER_TIME_KEY) [slot 8]
-    pushbytes DEFAULT_REWARD_RATE_PER_TIME_KEY              // "default_reward_rate_per_time"
-    app_global_get
-    store 8                                                 // default_reward_rate_per_time
-    // tl:130: if default_reward_rate_per_time:
-    load 8                                                  // default_reward_rate_per_time
-    bz l0_end
-    // then:
-        // tl:131: assert(reward_rate_per_time < (default_reward_rate_per_time + ((default_reward_rate_per_time * 100) / MAX_RATE_INCREMENT_PERCENTAGE)))
-        load 7                                              // reward_rate_per_time
-        load 8                                              // default_reward_rate_per_time
-        load 8                                              // default_reward_rate_per_time
-        pushint 100
-        *
-        pushint MAX_RATE_INCREMENT_PERCENTAGE               // 10
-        /
-        +
-        <
-        assert
-    l0_end:
-    
-    // tl:134: app_global_put(DEFAULT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
-    pushbytes DEFAULT_REWARD_RATE_PER_TIME_KEY              // "default_reward_rate_per_time"
-    load 7                                                  // reward_rate_per_time
-    app_global_put
-    
-    // tl:136: log(ARC28Event("set_default_rate(uint64,uint64)", itob(reward_rate_per_time), itob(Global.LatestTimestamp)))
-    pushbytes 0xef12e1c9                                    // SHA512_256("set_default_rate(uint64,uint64)")[:4]
-    load 7                                                  // reward_rate_per_time
-    itob
-    global LatestTimestamp
-    itob
-    concat
-    concat
-    log
-    // tl:137: return
-    retsub
-
-
-// Permission: manager
-// tl:143: func set_reward_rate(total_reward_amount: int, end_timestamp: int):
+// tl:125: func set_reward_rate(total_reward_amount: int, end_timestamp: int):
 __func__set_reward_rate:
-    store 9                                                 // end_timestamp [int]
-    store 10                                                // total_reward_amount [int]
-    // tl:144: assert(Txn.Sender == app_global_get(MANAGER_KEY))
+    store 7                                                 // end_timestamp [int]
+    store 8                                                 // total_reward_amount [int]
+    // tl:126: assert(Txn.Sender == app_global_get(MANAGER_KEY))
     txn Sender
     pushbytes MANAGER_KEY                                   // "manager"
     app_global_get
     ==
     assert
     
-    // tl:146: assert(total_reward_amount)
-    load 10                                                 // total_reward_amount
+    // tl:128: assert(total_reward_amount)
+    load 8                                                  // total_reward_amount
     assert
-    // tl:147: assert(end_timestamp > Global.LatestTimestamp)
-    load 9                                                  // end_timestamp
+    // tl:129: assert(end_timestamp > Global.LatestTimestamp)
+    load 7                                                  // end_timestamp
     global LatestTimestamp
     >
     assert
     
     // Wrap up, accumulate for the last rate.
-    // tl:150: update_state(Global.LatestTimestamp)
+    // tl:132: update_state(Global.LatestTimestamp)
     global LatestTimestamp
     callsub __func__update_state
     
-    // tl:152: int duration = end_timestamp - Global.LatestTimestamp [slot 11]
-    load 9                                                  // end_timestamp
+    // tl:134: int duration = end_timestamp - Global.LatestTimestamp [slot 9]
+    load 7                                                  // end_timestamp
     global LatestTimestamp
     -
-    store 11                                                // duration
-    // tl:153: int reward_rate_per_time = total_reward_amount / duration [slot 12]
-    load 10                                                 // total_reward_amount
-    load 11                                                 // duration
+    store 9                                                 // duration
+    // tl:135: int reward_rate_per_time = total_reward_amount / duration [slot 10]
+    load 8                                                  // total_reward_amount
+    load 9                                                  // duration
     /
-    store 12                                                // reward_rate_per_time
+    store 10                                                // reward_rate_per_time
     
-    // tl:155: int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY) [slot 13]
+    // tl:137: int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY) [slot 11]
+    pushbytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY // "current_reward_rate_per_time_end_timestamp"
+    app_global_get
+    store 11                                                // current_reward_rate_per_time_end_timestamp
+    // tl:138: int last_current_reward_rate_per_time = app_global_get(LAST_CURRENT_REWARD_RATE_PER_TIME_KEY) [slot 12]
+    pushbytes LAST_CURRENT_REWARD_RATE_PER_TIME_KEY         // "last_current_reward_rate_per_time"
+    app_global_get
+    store 12                                                // last_current_reward_rate_per_time
+    // tl:139: int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY) [slot 13]
     pushbytes CURRENT_REWARD_RATE_PER_TIME_KEY              // "current_reward_rate_per_time"
     app_global_get
     store 13                                                // current_reward_rate_per_time
-    // tl:156: if current_reward_rate_per_time:
+    
+    // tl:141: int max_rate_per_time [slot 14]
+    // tl:142: if last_current_reward_rate_per_time < current_reward_rate_per_time:
+    load 12                                                 // last_current_reward_rate_per_time
     load 13                                                 // current_reward_rate_per_time
+    <
+    bz l0_else
+    // then:
+        // tl:143: max_rate_per_time = current_reward_rate_per_time
+        load 13                                             // current_reward_rate_per_time
+        store 14                                            // max_rate_per_time
+        b l0_end
+    l0_else:
+    // tl:144: else:
+        // tl:145: max_rate_per_time = last_current_reward_rate_per_time
+        load 12                                             // last_current_reward_rate_per_time
+        store 14                                            // max_rate_per_time
+    l0_end:
+    // tl:147: max_rate_per_time = max_rate_per_time + ((max_rate_per_time * 100) / MAX_RATE_INCREMENT_PERCENTAGE)
+    load 14                                                 // max_rate_per_time
+    load 14                                                 // max_rate_per_time
+    pushint 100
+    *
+    pushint MAX_RATE_INCREMENT_PERCENTAGE                   // 10
+    /
+    +
+    store 14                                                // max_rate_per_time
+    
+    // Check is disabled for initialization. Use the saved value if it's bigger.
+    // tl:150: if max_rate_per_time:
+    load 14                                                 // max_rate_per_time
     bz l1_end
     // then:
-        // tl:157: assert(reward_rate_per_time < (current_reward_rate_per_time + ((current_reward_rate_per_time * 100) / MAX_RATE_INCREMENT_PERCENTAGE)))
-        load 12                                             // reward_rate_per_time
-        load 13                                             // current_reward_rate_per_time
-        load 13                                             // current_reward_rate_per_time
-        pushint 100
-        *
-        pushint MAX_RATE_INCREMENT_PERCENTAGE               // 10
-        /
-        +
+        // tl:151: assert(reward_rate_per_time < max_rate_per_time)
+        load 10                                             // reward_rate_per_time
+        load 14                                             // max_rate_per_time
         <
         assert
     l1_end:
     
-    // tl:160: app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
+    // tl:154: app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
     pushbytes CURRENT_REWARD_RATE_PER_TIME_KEY              // "current_reward_rate_per_time"
-    load 12                                                 // reward_rate_per_time
+    load 10                                                 // reward_rate_per_time
     app_global_put
-    // tl:161: app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, end_timestamp)
+    // tl:155: app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, end_timestamp)
     pushbytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY // "current_reward_rate_per_time_end_timestamp"
-    load 9                                                  // end_timestamp
+    load 7                                                  // end_timestamp
     app_global_put
     
-    // tl:163: log(ARC28Event("set_reward_rate(uint64,uint64,uint64)", itob(total_reward_amount), itob(Global.LatestTimestamp), itob(end_timestamp)))
-    pushbytes 0x34d1598b                                    // SHA512_256("set_reward_rate(uint64,uint64,uint64)")[:4]
-    load 10                                                 // total_reward_amount
+    // tl:157: log(ARC28Event("set_reward_rate(uint64,uint64,uint64,uint64)", itob(total_reward_amount), itob(Global.LatestTimestamp), itob(end_timestamp)))
+    pushbytes 0x0649aa78                                    // SHA512_256("set_reward_rate(uint64,uint64,uint64,uint64)")[:4]
+    load 8                                                  // total_reward_amount
     itob
     global LatestTimestamp
     itob
-    load 9                                                  // end_timestamp
+    load 7                                                  // end_timestamp
     itob
     concat
     concat
     concat
     log
-    // tl:164: return
+    // tl:158: return
     retsub
 
 
-// tl:169: func apply_rate_change():
+// Permission: anyone.
+// tl:164: func apply_rate_change():
 __func__apply_rate_change:
-    // tl:170: int reward_rate_per_time [slot 14]
+    // tl:165: int reward_rate_per_time [slot 15]
     
-    // tl:172: int default_reward_rate_per_time = app_global_get(DEFAULT_REWARD_RATE_PER_TIME_KEY) [slot 15]
-    pushbytes DEFAULT_REWARD_RATE_PER_TIME_KEY              // "default_reward_rate_per_time"
-    app_global_get
-    store 15                                                // default_reward_rate_per_time
-    // tl:173: int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY) [slot 16]
+    // tl:167: int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY) [slot 16]
     pushbytes CURRENT_REWARD_RATE_PER_TIME_KEY              // "current_reward_rate_per_time"
     app_global_get
     store 16                                                // current_reward_rate_per_time
-    // tl:174: int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY) [slot 17]
+    // tl:168: int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY) [slot 17]
     pushbytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY // "current_reward_rate_per_time_end_timestamp"
     app_global_get
     store 17                                                // current_reward_rate_per_time_end_timestamp
     
-    // tl:176: int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY) [slot 18]
+    // tl:170: int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY) [slot 18]
     pushbytes LAST_UPDATE_TIMESTAMP_KEY                     // "last_update_timestamp"
     app_global_get
     store 18                                                // last_update_timestamp
     
-    // tl:178: if Global.LatestTimestamp <= current_reward_rate_per_time_end_timestamp:
+    // tl:172: if Global.LatestTimestamp <= current_reward_rate_per_time_end_timestamp:
     global LatestTimestamp
     load 17                                                 // current_reward_rate_per_time_end_timestamp
     <=
     bz l2_else
     // then:
         // Do nothing. CURRENT_REWARD_RATE_PER_TIME is valid.
-        // tl:180: reward_rate_per_time = current_reward_rate_per_time
+        // tl:174: reward_rate_per_time = current_reward_rate_per_time
         load 16                                             // current_reward_rate_per_time
-        store 14                                            // reward_rate_per_time
+        store 15                                            // reward_rate_per_time
         
         b l2_end
     l2_else:
-    // tl:182: else:
-        
-        // If the period end is reached, fold the state and disable current rate.
-        // tl:185: if current_reward_rate_per_time_end_timestamp > 0:
+    // tl:176: else:
+        // tl:177: update_state(current_reward_rate_per_time_end_timestamp)
         load 17                                             // current_reward_rate_per_time_end_timestamp
-        pushint 0
-        >
-        bz l3_else
-        // then:
-            // tl:186: update_state(current_reward_rate_per_time_end_timestamp)
-            load 17                                         // current_reward_rate_per_time_end_timestamp
-            callsub __func__update_state
-            
-            // Disable the CURRENT_REWARD_RATE_PER_TIME global state usage.
-            // tl:189: app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, 0)
-            pushbytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY // "current_reward_rate_per_time_end_timestamp"
-            pushint 0
-            app_global_put
-            
-            // TODO: This might not be needed. Discuss.
-            // tl:192: update_state(Global.LatestTimestamp)
-            global LatestTimestamp
-            callsub __func__update_state
-            
-            // tl:194: reward_rate_per_time = default_reward_rate_per_time
-            load 15                                         // default_reward_rate_per_time
-            store 14                                        // reward_rate_per_time
-            
-            // tl:196: log(ARC28Event("apply_rate_change(uint64)", reward_rate_per_time))
-            pushbytes 0x01189c78                            // SHA512_256("apply_rate_change(uint64)")[:4]
-            load 14                                         // reward_rate_per_time
-            concat
-            log
-            b l3_end
-        l3_else:
-        // tl:197: else:
-            // CURRENT_REWARD_RATE_PER_TIME is already disabled. Do nothing.
-            // tl:199: reward_rate_per_time = default_reward_rate_per_time
-            load 15                                         // default_reward_rate_per_time
-            store 14                                        // reward_rate_per_time
-        l3_end:
+        callsub __func__update_state
         
+        // Save the CURRENT_REWARD_RATE_PER_TIME for increment check in `set_reward_rate`.
+        // tl:180: app_global_put(LAST_CURRENT_REWARD_RATE_PER_TIME_KEY, current_reward_rate_per_time)
+        pushbytes LAST_CURRENT_REWARD_RATE_PER_TIME_KEY     // "last_current_reward_rate_per_time"
+        load 16                                             // current_reward_rate_per_time
+        app_global_put
+        
+        // Update the CURRENT_REWARD_RATE_PER_TIME to 0.
+        // tl:183: app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
+        pushbytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY // "current_reward_rate_per_time_end_timestamp"
+        pushint MAX_UINT64                                  // 18446744073709551615
+        app_global_put
+        // tl:184: app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+        pushbytes CURRENT_REWARD_RATE_PER_TIME_KEY          // "current_reward_rate_per_time"
+        pushint 0
+        app_global_put
+        
+        // TODO: This might not be needed. Discuss.
+        // tl:187: update_state(Global.LatestTimestamp)
+        global LatestTimestamp
+        callsub __func__update_state
+        
+        // tl:189: reward_rate_per_time = 0
+        pushint 0
+        store 15                                            // reward_rate_per_time
+        // tl:190: log(ARC28Event("apply_rate_change(uint64)", itob(reward_rate_per_time)))
+        pushbytes 0x01189c78                                // SHA512_256("apply_rate_change(uint64)")[:4]
+        load 15                                             // reward_rate_per_time
+        itob
+        concat
+        log
     l2_end:
     
-    // tl:204: return
+    // tl:193: return
     retsub
 
 
-// Ensure it is called after `apply_rate_change`
-// tl:209: func get_reward_rate_per_time() int:
+// Validate and get CURRENT_REWARD_RATE_PER_TIME value.
+// tl:198: func get_reward_rate_per_time() int:
 __func__get_reward_rate_per_time:
-    // tl:210: int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY) [slot 19]
-    pushbytes LAST_UPDATE_TIMESTAMP_KEY                     // "last_update_timestamp"
-    app_global_get
-    store 19                                                // last_update_timestamp
-    // tl:211: int default_reward_rate_per_time = app_global_get(DEFAULT_REWARD_RATE_PER_TIME_KEY) [slot 20]
-    pushbytes DEFAULT_REWARD_RATE_PER_TIME_KEY              // "default_reward_rate_per_time"
-    app_global_get
-    store 20                                                // default_reward_rate_per_time
-    // tl:212: int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY) [slot 21]
+    // tl:199: int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY) [slot 19]
     pushbytes CURRENT_REWARD_RATE_PER_TIME_KEY              // "current_reward_rate_per_time"
     app_global_get
-    store 21                                                // current_reward_rate_per_time
-    // tl:213: int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY) [slot 22]
+    store 19                                                // current_reward_rate_per_time
+    // tl:200: int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY) [slot 20]
     pushbytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY // "current_reward_rate_per_time_end_timestamp"
     app_global_get
-    store 22                                                // current_reward_rate_per_time_end_timestamp
+    store 20                                                // current_reward_rate_per_time_end_timestamp
     
     // Ensure CURRENT_REWARD_RATE_PER_TIME is disabled or still valid.
-    // tl:216: assert((current_reward_rate_per_time_end_timestamp == 0) || (Global.LatestTimestamp <= current_reward_rate_per_time_end_timestamp))
-    load 22                                                 // current_reward_rate_per_time_end_timestamp
-    pushint 0
-    ==
+    // tl:203: assert(Global.LatestTimestamp <= current_reward_rate_per_time_end_timestamp)
     global LatestTimestamp
-    load 22                                                 // current_reward_rate_per_time_end_timestamp
+    load 20                                                 // current_reward_rate_per_time_end_timestamp
     <=
-    ||
     assert
     
-    // tl:218: int reward_rate_per_time [slot 23]
-    // tl:219: if current_reward_rate_per_time_end_timestamp == 0:
-    load 22                                                 // current_reward_rate_per_time_end_timestamp
-    pushint 0
-    ==
-    bz l4_else
-    // then:
-        // tl:220: reward_rate_per_time = default_reward_rate_per_time
-        load 20                                             // default_reward_rate_per_time
-        store 23                                            // reward_rate_per_time
-        b l4_end
-    l4_else:
-    // tl:221: else:
-        // tl:222: reward_rate_per_time = current_reward_rate_per_time
-        load 21                                             // current_reward_rate_per_time
-        store 23                                            // reward_rate_per_time
-    l4_end:
-    
-    // tl:225: return reward_rate_per_time
-    load 23                                                 // reward_rate_per_time
+    // tl:205: return current_reward_rate_per_time
+    load 19                                                 // current_reward_rate_per_time
     retsub
 
 
-// tl:230: func update_state(timestamp: int):
+// tl:210: func update_state(timestamp: int):
 __func__update_state:
-    store 24                                                // timestamp [int]
-    // tl:231: int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY) [slot 25]
+    store 21                                                // timestamp [int]
+    // tl:211: int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY) [slot 22]
     pushbytes LAST_UPDATE_TIMESTAMP_KEY                     // "last_update_timestamp"
     app_global_get
-    store 25                                                // last_update_timestamp
-    // tl:232: int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT) [slot 26]
+    store 22                                                // last_update_timestamp
+    // tl:212: int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT) [slot 23]
     pushbytes ACCUMULATED_REWARDS_PER_UNIT                  // "accumulated_rewards_per_unit"
     app_global_get
-    store 26                                                // accumulated_rewards_per_unit
-    // tl:233: int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY) [slot 27]
+    store 23                                                // accumulated_rewards_per_unit
+    // tl:213: int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY) [slot 24]
     pushbytes TOTAL_STAKED_AMOUNT_KEY                       // "total_staked_amount"
     app_global_get
-    store 27                                                // total_staked_amount
+    store 24                                                // total_staked_amount
     
-    // tl:235: int reward_rate_per_time = get_reward_rate_per_time() [slot 28]
+    // tl:215: int reward_rate_per_time = get_reward_rate_per_time() [slot 25]
     callsub __func__get_reward_rate_per_time
-    store 28                                                // reward_rate_per_time
+    store 25                                                // reward_rate_per_time
     
-    // tl:237: if total_staked_amount:
-    load 27                                                 // total_staked_amount
-    bz l5_end
+    // tl:217: if total_staked_amount:
+    load 24                                                 // total_staked_amount
+    bz l3_end
     // then:
-        // tl:238: int time_delta = Global.LatestTimestamp - last_update_timestamp [slot 29]
+        // tl:218: int time_delta = Global.LatestTimestamp - last_update_timestamp [slot 26]
         global LatestTimestamp
-        load 25                                             // last_update_timestamp
+        load 22                                             // last_update_timestamp
         -
-        store 29                                            // time_delta
+        store 26                                            // time_delta
         
-        // tl:240: int reward_rate_per_unit_per_time = (reward_rate_per_time * RPU_SCALER) / total_staked_amount [slot 30]
-        load 28                                             // reward_rate_per_time
+        // tl:220: int reward_rate_per_unit_per_time = (reward_rate_per_time * RPU_SCALER) / total_staked_amount [slot 27]
+        load 25                                             // reward_rate_per_time
         pushint RPU_SCALER                                  // 1000000000
         *
-        load 27                                             // total_staked_amount
+        load 24                                             // total_staked_amount
         /
-        store 30                                            // reward_rate_per_unit_per_time
-        // tl:241: accumulated_rewards_per_unit = accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
-        load 26                                             // accumulated_rewards_per_unit
-        load 30                                             // reward_rate_per_unit_per_time
-        load 29                                             // time_delta
+        store 27                                            // reward_rate_per_unit_per_time
+        // tl:221: accumulated_rewards_per_unit = accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
+        load 23                                             // accumulated_rewards_per_unit
+        load 27                                             // reward_rate_per_unit_per_time
+        load 26                                             // time_delta
         *
         +
-        store 26                                            // accumulated_rewards_per_unit
+        store 23                                            // accumulated_rewards_per_unit
         
-        // tl:243: app_global_put(LAST_UPDATE_TIMESTAMP_KEY, Global.LatestTimestamp)
+        // tl:223: app_global_put(LAST_UPDATE_TIMESTAMP_KEY, Global.LatestTimestamp)
         pushbytes LAST_UPDATE_TIMESTAMP_KEY                 // "last_update_timestamp"
         global LatestTimestamp
         app_global_put
-        // tl:244: app_global_put(ACCUMULATED_REWARDS_PER_UNIT, accumulated_rewards_per_unit)
+        // tl:224: app_global_put(ACCUMULATED_REWARDS_PER_UNIT, accumulated_rewards_per_unit)
         pushbytes ACCUMULATED_REWARDS_PER_UNIT              // "accumulated_rewards_per_unit"
-        load 26                                             // accumulated_rewards_per_unit
+        load 23                                             // accumulated_rewards_per_unit
         app_global_put
-    l5_end:
+    l3_end:
     
-    // tl:247: log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(last_update_timestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
+    // tl:227: log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(last_update_timestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
     pushbytes 0xc04498db                                    // SHA512_256("state(uint64,uint64,uint64,uint64)")[:4]
-    load 25                                                 // last_update_timestamp
+    load 22                                                 // last_update_timestamp
     itob
-    load 28                                                 // reward_rate_per_time
+    load 25                                                 // reward_rate_per_time
     itob
-    load 26                                                 // accumulated_rewards_per_unit
+    load 23                                                 // accumulated_rewards_per_unit
     itob
-    load 27                                                 // total_staked_amount
+    load 24                                                 // total_staked_amount
     itob
     concat
     concat
     concat
     concat
     log
-    // tl:248: return
+    // tl:228: return
     retsub
 
 
-// tl:252: func update_user_state(user_address: bytes[32]):
+// tl:232: func update_user_state(user_address: bytes[32]):
 __func__update_user_state:
-    store 31                                                // user_address [bytes[32]]
-    // tl:253: int rewards_per_unit_delta [slot 32]
-    // tl:254: int rewards_delta [slot 33]
+    store 28                                                // user_address [bytes[32]]
+    // tl:233: int rewards_per_unit_delta [slot 29]
+    // tl:234: int rewards_delta [slot 30]
     
-    // tl:256: box<UserState> user_state = OpenBox(user_address) [slot 34]
-    load 31                                                 // user_address
+    // tl:236: box<UserState> user_state = OpenBox(user_address) [slot 31]
+    load 28                                                 // user_address
     dup; box_len; assert; pushint 32; ==; assert            // len(box) == UserState.size
-    store 34                                                // box:user_state
+    store 31                                                // box:user_state
     
-    // tl:258: int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY) [slot 35]
+    // tl:238: int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY) [slot 32]
     pushbytes LAST_UPDATE_TIMESTAMP_KEY                     // "last_update_timestamp"
     app_global_get
-    store 35                                                // last_update_timestamp
-    // tl:259: int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT) [slot 36]
+    store 32                                                // last_update_timestamp
+    // tl:239: int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT) [slot 33]
     pushbytes ACCUMULATED_REWARDS_PER_UNIT                  // "accumulated_rewards_per_unit"
     app_global_get
-    store 36                                                // accumulated_rewards_per_unit
-    // tl:260: int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY) [slot 37]
+    store 33                                                // accumulated_rewards_per_unit
+    // tl:240: int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY) [slot 34]
     pushbytes TOTAL_STAKED_AMOUNT_KEY                       // "total_staked_amount"
     app_global_get
-    store 37                                                // total_staked_amount
+    store 34                                                // total_staked_amount
     
-    // tl:262: rewards_per_unit_delta = accumulated_rewards_per_unit - user_state.accumulated_rewards_per_unit_at_last_update
-    load 36                                                 // accumulated_rewards_per_unit
-    load 34; pushint 8; pushint 8; box_extract; btoi// user_state.accumulated_rewards_per_unit_at_last_update
+    // tl:242: rewards_per_unit_delta = accumulated_rewards_per_unit - user_state.accumulated_rewards_per_unit_at_last_update
+    load 33                                                 // accumulated_rewards_per_unit
+    load 31; pushint 8; pushint 8; box_extract; btoi// user_state.accumulated_rewards_per_unit_at_last_update
     -
-    store 32                                                // rewards_per_unit_delta
-    // tl:263: rewards_delta = (user_state.staked_amount * rewards_per_unit_delta) / RPU_SCALER
-    load 34; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
-    load 32                                                 // rewards_per_unit_delta
+    store 29                                                // rewards_per_unit_delta
+    // tl:243: rewards_delta = (user_state.staked_amount * rewards_per_unit_delta) / RPU_SCALER
+    load 31; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
+    load 29                                                 // rewards_per_unit_delta
     *
     pushint RPU_SCALER                                      // 1000000000
     /
-    store 33                                                // rewards_delta
+    store 30                                                // rewards_delta
     
-    // tl:265: user_state.accumulated_rewards = user_state.accumulated_rewards + rewards_delta
-    load 34; pushint 16; pushint 8; box_extract; btoi// user_state.accumulated_rewards
-    load 33                                                 // rewards_delta
+    // tl:245: user_state.accumulated_rewards = user_state.accumulated_rewards + rewards_delta
+    load 31; pushint 16; pushint 8; box_extract; btoi// user_state.accumulated_rewards
+    load 30                                                 // rewards_delta
     +
     itob
-    load 34
+    load 31
     pushint 16
     uncover 2
     box_replace
     // boxset user_state.accumulated_rewards
-    // tl:266: user_state.accumulated_rewards_per_unit_at_last_update = accumulated_rewards_per_unit
-    load 36                                                 // accumulated_rewards_per_unit
+    // tl:246: user_state.accumulated_rewards_per_unit_at_last_update = accumulated_rewards_per_unit
+    load 33                                                 // accumulated_rewards_per_unit
     itob
-    load 34
+    load 31
     pushint 8
     uncover 2
     box_replace
     // boxset user_state.accumulated_rewards_per_unit_at_last_update
-    // tl:267: user_state.timestamp = Global.LatestTimestamp
+    // tl:247: user_state.timestamp = Global.LatestTimestamp
     global LatestTimestamp
     itob
-    load 34
+    load 31
     pushint 24
     uncover 2
     box_replace
     // boxset user_state.timestamp
     
-    // tl:269: bytes user_state_data [slot 38]
-    // tl:270: _, user_state_data = box_get(user_state)
-    load 34                                                 // user_state
+    // tl:249: bytes user_state_data [slot 35]
+    // tl:250: _, user_state_data = box_get(user_state)
+    load 31                                                 // user_state
     box_get
     pop                                                     // discarding value for _
-    store 38                                                // user_state_data
-    // tl:271: log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
+    store 35                                                // user_state_data
+    // tl:251: log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
     pushbytes 0x7c2c0963                                    // SHA512_256("user_state(address,uint64,uint64,uint64,uint64)")[:4]
     txn Sender
-    load 38                                                 // user_state_data
+    load 35                                                 // user_state_data
     concat
     concat
     log
-    // tl:272: log(ARC28Event("update_user_state(address)", Txn.Sender))
+    // tl:252: log(ARC28Event("update_user_state(address)", Txn.Sender))
     pushbytes 0xcd1efe91                                    // SHA512_256("update_user_state(address)")[:4]
     txn Sender
     concat
     log
-    // tl:273: return
+    // tl:253: return
     retsub
 
 
 // Permission: user
-// tl:279: func increase_stake(amount: int):
+// tl:259: func increase_stake(amount: int):
 __func__increase_stake:
-    store 39                                                // amount [int]
-    // tl:280: int total_staker_count [slot 40]
-    // tl:281: int current_tiny_power [slot 41]
+    store 36                                                // amount [int]
+    // tl:260: int total_staker_count [slot 37]
+    // tl:261: int current_tiny_power [slot 38]
     
-    // tl:283: box<UserState> user_state = OpenOrCreateBox(Txn.Sender) [slot 42]
+    // tl:263: box<UserState> user_state = OpenOrCreateBox(Txn.Sender) [slot 39]
     txn Sender
     dup; pushint 32; box_create; pop                        // create if didn't already exist
-    store 42                                                // box:user_state
+    store 39                                                // box:user_state
     
-    // tl:285: update_state(Global.LatestTimestamp)
+    // tl:265: update_state(Global.LatestTimestamp)
     global LatestTimestamp
     callsub __func__update_state
-    // tl:286: update_user_state(Txn.Sender)
+    // tl:266: update_user_state(Txn.Sender)
     txn Sender
     callsub __func__update_user_state
     
-    // tl:288: check_received_talgo(Txn.GroupIndex - 1, amount)
+    // tl:268: check_received_talgo(Txn.GroupIndex - 1, amount)
     txn GroupIndex
     pushint 1
     -
-    load 39                                                 // amount
+    load 36                                                 // amount
     callsub __func__check_received_talgo
-    // tl:289: user_state.staked_amount = user_state.staked_amount + amount
-    load 42; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
-    load 39                                                 // amount
+    // tl:269: user_state.staked_amount = user_state.staked_amount + amount
+    load 39; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
+    load 36                                                 // amount
     +
     itob
-    load 42
+    load 39
     pushint 0
     uncover 2
     box_replace
     // boxset user_state.staked_amount
     
-    // tl:291: send_stalgo(amount, Txn.Sender)
-    load 39                                                 // amount
+    // tl:271: send_stalgo(amount, Txn.Sender)
+    load 36                                                 // amount
     txn Sender
     callsub __func__send_stalgo
     
-    // tl:293: if !user_state.staked_amount:
-    load 42; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
+    // tl:273: if !user_state.staked_amount:
+    load 39; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
     !
-    bz l6_end
+    bz l4_end
     // then:
-        // tl:294: current_tiny_power = get_account_voting_power(Txn.Sender)
+        // tl:274: current_tiny_power = get_account_voting_power(Txn.Sender)
         txn Sender
         callsub __func__get_account_voting_power
-        store 41                                            // current_tiny_power
-        // tl:295: assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))
-        load 41                                             // current_tiny_power
+        store 38                                            // current_tiny_power
+        // tl:275: assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))
+        load 38                                             // current_tiny_power
         pushbytes TINY_POWER_THRESHOLD_KEY                  // "tiny_power_threshold"
         app_global_get
         >=
         assert
         
-        // tl:297: total_staker_count = app_global_get(TOTAL_STAKER_COUNT_KEY)
+        // tl:277: total_staker_count = app_global_get(TOTAL_STAKER_COUNT_KEY)
         pushbytes TOTAL_STAKER_COUNT_KEY                    // "total_staker_count"
         app_global_get
-        store 40                                            // total_staker_count
-        // tl:298: total_staker_count = total_staker_count + 1
-        load 40                                             // total_staker_count
+        store 37                                            // total_staker_count
+        // tl:278: total_staker_count = total_staker_count + 1
+        load 37                                             // total_staker_count
         pushint 1
         +
-        store 40                                            // total_staker_count
-        // tl:299: app_global_put(TOTAL_STAKER_COUNT_KEY, total_staker_count)
+        store 37                                            // total_staker_count
+        // tl:279: app_global_put(TOTAL_STAKER_COUNT_KEY, total_staker_count)
         pushbytes TOTAL_STAKER_COUNT_KEY                    // "total_staker_count"
-        load 40                                             // total_staker_count
+        load 37                                             // total_staker_count
         app_global_put
-    l6_end:
+    l4_end:
     
-    // tl:302: int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY) [slot 43]
+    // tl:282: int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY) [slot 40]
     pushbytes TOTAL_STAKED_AMOUNT_KEY                       // "total_staked_amount"
     app_global_get
-    store 43                                                // total_staked_amount
-    // tl:303: total_staked_amount = total_staked_amount + amount
-    load 43                                                 // total_staked_amount
-    load 39                                                 // amount
+    store 40                                                // total_staked_amount
+    // tl:283: total_staked_amount = total_staked_amount + amount
+    load 40                                                 // total_staked_amount
+    load 36                                                 // amount
     +
-    store 43                                                // total_staked_amount
-    // tl:304: app_global_put(TOTAL_STAKED_AMOUNT_KEY, total_staked_amount)
+    store 40                                                // total_staked_amount
+    // tl:284: app_global_put(TOTAL_STAKED_AMOUNT_KEY, total_staked_amount)
     pushbytes TOTAL_STAKED_AMOUNT_KEY                       // "total_staked_amount"
-    load 43                                                 // total_staked_amount
+    load 40                                                 // total_staked_amount
     app_global_put
     
-    // tl:306: bytes user_state_data [slot 44]
-    // tl:307: _, user_state_data = box_get(user_state)
-    load 42                                                 // user_state
+    // tl:286: bytes user_state_data [slot 41]
+    // tl:287: _, user_state_data = box_get(user_state)
+    load 39                                                 // user_state
     box_get
     pop                                                     // discarding value for _
-    store 44                                                // user_state_data
-    // tl:308: log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
+    store 41                                                // user_state_data
+    // tl:288: log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
     pushbytes 0x7c2c0963                                    // SHA512_256("user_state(address,uint64,uint64,uint64,uint64)")[:4]
     txn Sender
-    load 44                                                 // user_state_data
+    load 41                                                 // user_state_data
     concat
     concat
     log
-    // tl:309: log(ARC28Event("increase_stake(uint64)", itob(amount)))
+    // tl:289: log(ARC28Event("increase_stake(uint64)", itob(amount)))
     pushbytes 0xa786e814                                    // SHA512_256("increase_stake(uint64)")[:4]
-    load 39                                                 // amount
+    load 36                                                 // amount
     itob
     concat
     log
-    // tl:310: return
+    // tl:290: return
     retsub
 
 
 // Permission: user
-// tl:316: func decrease_stake(amount: int):
+// tl:296: func decrease_stake(amount: int):
 __func__decrease_stake:
-    store 45                                                // amount [int]
-    // tl:317: int total_staker_count [slot 46]
+    store 42                                                // amount [int]
+    // tl:297: int total_staker_count [slot 43]
     
-    // tl:319: box<UserState> user_state = OpenBox(Txn.Sender) [slot 47]
+    // tl:299: box<UserState> user_state = OpenBox(Txn.Sender) [slot 44]
     txn Sender
     dup; box_len; assert; pushint 32; ==; assert            // len(box) == UserState.size
-    store 47                                                // box:user_state
+    store 44                                                // box:user_state
     
-    // tl:321: update_state(Global.LatestTimestamp)
+    // tl:301: update_state(Global.LatestTimestamp)
     global LatestTimestamp
     callsub __func__update_state
-    // tl:322: update_user_state(Txn.Sender)
+    // tl:302: update_user_state(Txn.Sender)
     txn Sender
     callsub __func__update_user_state
     
-    // tl:324: assert(amount > 0)
-    load 45                                                 // amount
+    // tl:304: assert(amount > 0)
+    load 42                                                 // amount
     pushint 0
     >
     assert
-    // tl:325: assert(amount <= user_state.staked_amount)
-    load 45                                                 // amount
-    load 47; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
+    // tl:305: assert(amount <= user_state.staked_amount)
+    load 42                                                 // amount
+    load 44; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
     <=
     assert
     
-    // tl:327: user_state.staked_amount = user_state.staked_amount - amount
-    load 47; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
-    load 45                                                 // amount
+    // tl:307: user_state.staked_amount = user_state.staked_amount - amount
+    load 44; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
+    load 42                                                 // amount
     -
     itob
-    load 47
+    load 44
     pushint 0
     uncover 2
     box_replace
     // boxset user_state.staked_amount
-    // tl:328: clawback_stalgo(amount, Txn.Sender)
-    load 45                                                 // amount
+    // tl:308: clawback_stalgo(amount, Txn.Sender)
+    load 42                                                 // amount
     txn Sender
     callsub __func__clawback_stalgo
     
-    // tl:330: send_talgo(amount, Txn.Sender)
-    load 45                                                 // amount
+    // tl:310: send_talgo(amount, Txn.Sender)
+    load 42                                                 // amount
     txn Sender
     callsub __func__send_talgo
     
-    // tl:332: if !user_state.staked_amount:
-    load 47; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
+    // tl:312: if !user_state.staked_amount:
+    load 44; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
     !
-    bz l7_end
+    bz l5_end
     // then:
-        // tl:333: total_staker_count = app_global_get(TOTAL_STAKER_COUNT_KEY)
+        // tl:313: total_staker_count = app_global_get(TOTAL_STAKER_COUNT_KEY)
         pushbytes TOTAL_STAKER_COUNT_KEY                    // "total_staker_count"
         app_global_get
-        store 46                                            // total_staker_count
-        // tl:334: total_staker_count = total_staker_count - 1
-        load 46                                             // total_staker_count
+        store 43                                            // total_staker_count
+        // tl:314: total_staker_count = total_staker_count - 1
+        load 43                                             // total_staker_count
         pushint 1
         -
-        store 46                                            // total_staker_count
-        // tl:335: app_global_put(TOTAL_STAKER_COUNT_KEY, total_staker_count)
+        store 43                                            // total_staker_count
+        // tl:315: app_global_put(TOTAL_STAKER_COUNT_KEY, total_staker_count)
         pushbytes TOTAL_STAKER_COUNT_KEY                    // "total_staker_count"
-        load 46                                             // total_staker_count
+        load 43                                             // total_staker_count
         app_global_put
-    l7_end:
+    l5_end:
     
-    // tl:338: int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY) [slot 48]
+    // tl:318: int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY) [slot 45]
     pushbytes TOTAL_STAKED_AMOUNT_KEY                       // "total_staked_amount"
     app_global_get
-    store 48                                                // total_staked_amount
-    // tl:339: total_staked_amount = total_staked_amount - amount
-    load 48                                                 // total_staked_amount
-    load 45                                                 // amount
+    store 45                                                // total_staked_amount
+    // tl:319: total_staked_amount = total_staked_amount - amount
+    load 45                                                 // total_staked_amount
+    load 42                                                 // amount
     -
-    store 48                                                // total_staked_amount
-    // tl:340: app_global_put(TOTAL_STAKED_AMOUNT_KEY, total_staked_amount)
+    store 45                                                // total_staked_amount
+    // tl:320: app_global_put(TOTAL_STAKED_AMOUNT_KEY, total_staked_amount)
     pushbytes TOTAL_STAKED_AMOUNT_KEY                       // "total_staked_amount"
-    load 48                                                 // total_staked_amount
+    load 45                                                 // total_staked_amount
     app_global_put
     
-    // tl:342: bytes user_state_data [slot 49]
-    // tl:343: _, user_state_data = box_get(user_state)
+    // tl:322: bytes user_state_data [slot 46]
+    // tl:323: _, user_state_data = box_get(user_state)
+    load 44                                                 // user_state
+    box_get
+    pop                                                     // discarding value for _
+    store 46                                                // user_state_data
+    // tl:324: log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
+    pushbytes 0x7c2c0963                                    // SHA512_256("user_state(address,uint64,uint64,uint64,uint64)")[:4]
+    txn Sender
+    load 46                                                 // user_state_data
+    concat
+    concat
+    log
+    // tl:325: log(ARC28Event("decrease_stake(uint64)", itob(amount)))
+    pushbytes 0x3ee9e712                                    // SHA512_256("decrease_stake(uint64)")[:4]
+    load 42                                                 // amount
+    itob
+    concat
+    log
+    // tl:326: return
+    retsub
+
+
+// Permission: user
+// tl:332: func claim_rewards():
+__func__claim_rewards:
+    // tl:333: box<UserState> user_state = OpenBox(Txn.Sender) [slot 47]
+    txn Sender
+    dup; box_len; assert; pushint 32; ==; assert            // len(box) == UserState.size
+    store 47                                                // box:user_state
+    
+    // tl:335: update_state(Global.LatestTimestamp)
+    global LatestTimestamp
+    callsub __func__update_state
+    // tl:336: update_user_state(Txn.Sender)
+    txn Sender
+    callsub __func__update_user_state
+    
+    // tl:338: int amount = user_state.accumulated_rewards [slot 48]
+    load 47; pushint 16; pushint 8; box_extract; btoi// user_state.accumulated_rewards
+    store 48                                                // amount
+    // tl:339: if amount:
+    load 48                                                 // amount
+    bz l6_end
+    // then:
+        // tl:340: send_rewards(amount, Txn.Sender)
+        load 48                                             // amount
+        txn Sender
+        callsub __func__send_rewards
+        // tl:341: user_state.accumulated_rewards = 0
+        pushint 0
+        itob
+        load 47
+        pushint 16
+        uncover 2
+        box_replace
+        // boxset user_state.accumulated_rewards
+    l6_end:
+    
+    // tl:344: bytes user_state_data [slot 49]
+    // tl:345: _, user_state_data = box_get(user_state)
     load 47                                                 // user_state
     box_get
     pop                                                     // discarding value for _
     store 49                                                // user_state_data
-    // tl:344: log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
+    // tl:346: log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
     pushbytes 0x7c2c0963                                    // SHA512_256("user_state(address,uint64,uint64,uint64,uint64)")[:4]
     txn Sender
     load 49                                                 // user_state_data
     concat
     concat
     log
-    // tl:345: log(ARC28Event("decrease_stake(uint64)", itob(amount)))
-    pushbytes 0x3ee9e712                                    // SHA512_256("decrease_stake(uint64)")[:4]
-    load 45                                                 // amount
-    itob
-    concat
-    log
-    // tl:346: return
-    retsub
-
-
-// Permission: user
-// tl:352: func claim_rewards():
-__func__claim_rewards:
-    // tl:353: box<UserState> user_state = OpenBox(Txn.Sender) [slot 50]
-    txn Sender
-    dup; box_len; assert; pushint 32; ==; assert            // len(box) == UserState.size
-    store 50                                                // box:user_state
-    
-    // tl:355: update_state(Global.LatestTimestamp)
-    global LatestTimestamp
-    callsub __func__update_state
-    // tl:356: update_user_state(Txn.Sender)
-    txn Sender
-    callsub __func__update_user_state
-    
-    // tl:358: int amount = user_state.accumulated_rewards [slot 51]
-    load 50; pushint 16; pushint 8; box_extract; btoi// user_state.accumulated_rewards
-    store 51                                                // amount
-    // tl:359: if amount:
-    load 51                                                 // amount
-    bz l8_end
-    // then:
-        // tl:360: send_rewards(amount, Txn.Sender)
-        load 51                                             // amount
-        txn Sender
-        callsub __func__send_rewards
-        // tl:361: user_state.accumulated_rewards = 0
-        pushint 0
-        itob
-        load 50
-        pushint 16
-        uncover 2
-        box_replace
-        // boxset user_state.accumulated_rewards
-    l8_end:
-    
-    // tl:364: bytes user_state_data [slot 52]
-    // tl:365: _, user_state_data = box_get(user_state)
-    load 50                                                 // user_state
-    box_get
-    pop                                                     // discarding value for _
-    store 52                                                // user_state_data
-    // tl:366: log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
-    pushbytes 0x7c2c0963                                    // SHA512_256("user_state(address,uint64,uint64,uint64,uint64)")[:4]
-    txn Sender
-    load 52                                                 // user_state_data
-    concat
-    concat
-    log
-    // tl:367: log(ARC28Event("claim_rewards(uint64)", itob(amount)))
+    // tl:347: log(ARC28Event("claim_rewards(uint64)", itob(amount)))
     pushbytes 0x92c386c4                                    // SHA512_256("claim_rewards(uint64)")[:4]
-    load 51                                                 // amount
+    load 48                                                 // amount
     itob
     concat
     log
-    // tl:368: return
+    // tl:348: return
     retsub
 
 
-// tl:372: func send_stalgo(amount: int, receiver: bytes[32]):
+// tl:352: func send_stalgo(amount: int, receiver: bytes[32]):
 __func__send_stalgo:
-    store 53                                                // receiver [bytes[32]]
-    store 54                                                // amount [int]
-    // tl:373: inner_txn:
+    store 50                                                // receiver [bytes[32]]
+    store 51                                                // amount [int]
+    // tl:353: inner_txn:
     itxn_begin
-        // tl:374: TypeEnum: Axfer
+        // tl:354: TypeEnum: Axfer
         pushint 4                                           // Axfer
         itxn_field TypeEnum
-        // tl:375: Sender: Global.CurrentApplicationAddress
+        // tl:355: Sender: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field Sender
-        // tl:376: AssetReceiver: receiver
-        load 53                                             // receiver
+        // tl:356: AssetReceiver: receiver
+        load 50                                             // receiver
         itxn_field AssetReceiver
-        // tl:377: AssetAmount: amount
-        load 54                                             // amount
+        // tl:357: AssetAmount: amount
+        load 51                                             // amount
         itxn_field AssetAmount
-        // tl:378: XferAsset: app_global_get(STALGO_ASSET_ID_KEY)
+        // tl:358: XferAsset: app_global_get(STALGO_ASSET_ID_KEY)
         pushbytes STALGO_ASSET_ID_KEY                       // "stalgo_asset_id"
         app_global_get
         itxn_field XferAsset
-        // tl:379: Fee: 0
+        // tl:359: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
     
-    // tl:382: return
+    // tl:362: return
     retsub
 
 
-// tl:386: func send_talgo(amount: int, receiver: bytes[32]):
+// tl:366: func send_talgo(amount: int, receiver: bytes[32]):
 __func__send_talgo:
-    store 55                                                // receiver [bytes[32]]
-    store 56                                                // amount [int]
-    // tl:387: inner_txn:
+    store 52                                                // receiver [bytes[32]]
+    store 53                                                // amount [int]
+    // tl:367: inner_txn:
     itxn_begin
-        // tl:388: TypeEnum: Axfer
+        // tl:368: TypeEnum: Axfer
         pushint 4                                           // Axfer
         itxn_field TypeEnum
-        // tl:389: Sender: Global.CurrentApplicationAddress
+        // tl:369: Sender: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field Sender
-        // tl:390: AssetReceiver: receiver
-        load 55                                             // receiver
+        // tl:370: AssetReceiver: receiver
+        load 52                                             // receiver
         itxn_field AssetReceiver
-        // tl:391: AssetAmount: amount
-        load 56                                             // amount
+        // tl:371: AssetAmount: amount
+        load 53                                             // amount
         itxn_field AssetAmount
-        // tl:392: XferAsset: app_global_get(TALGO_ASSET_ID_KEY)
+        // tl:372: XferAsset: app_global_get(TALGO_ASSET_ID_KEY)
         pushbytes TALGO_ASSET_ID_KEY                        // "talgo_asset_id"
         app_global_get
         itxn_field XferAsset
-        // tl:393: Fee: 0
+        // tl:373: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
     
-    // tl:396: return
+    // tl:376: return
     retsub
 
 
-// tl:400: func send_rewards(amount: int, receiver: bytes[32]):
+// tl:380: func send_rewards(amount: int, receiver: bytes[32]):
 __func__send_rewards:
-    store 57                                                // receiver [bytes[32]]
-    store 58                                                // amount [int]
-    // tl:401: inner_txn:
+    store 54                                                // receiver [bytes[32]]
+    store 55                                                // amount [int]
+    // tl:381: inner_txn:
     itxn_begin
-        // tl:402: TypeEnum: Axfer
+        // tl:382: TypeEnum: Axfer
         pushint 4                                           // Axfer
         itxn_field TypeEnum
-        // tl:403: Sender: Global.CurrentApplicationAddress
+        // tl:383: Sender: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field Sender
-        // tl:404: AssetReceiver: receiver
-        load 57                                             // receiver
+        // tl:384: AssetReceiver: receiver
+        load 54                                             // receiver
         itxn_field AssetReceiver
-        // tl:405: AssetAmount: amount
-        load 58                                             // amount
+        // tl:385: AssetAmount: amount
+        load 55                                             // amount
         itxn_field AssetAmount
-        // tl:406: XferAsset: app_global_get(TINY_ASSET_ID_KEY)
+        // tl:386: XferAsset: app_global_get(TINY_ASSET_ID_KEY)
         pushbytes TINY_ASSET_ID_KEY                         // "tiny_asset_id"
         app_global_get
         itxn_field XferAsset
-        // tl:407: Fee: 0
+        // tl:387: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
     
-    // tl:410: return
+    // tl:390: return
     retsub
 
 
-// tl:414: func clawback_stalgo(amount: int, user: bytes[32]):
+// tl:394: func clawback_stalgo(amount: int, user: bytes[32]):
 __func__clawback_stalgo:
-    store 59                                                // user [bytes[32]]
-    store 60                                                // amount [int]
-    // tl:415: inner_txn:
+    store 56                                                // user [bytes[32]]
+    store 57                                                // amount [int]
+    // tl:395: inner_txn:
     itxn_begin
-        // tl:416: TypeEnum: Axfer
+        // tl:396: TypeEnum: Axfer
         pushint 4                                           // Axfer
         itxn_field TypeEnum
-        // tl:417: Sender: Global.CurrentApplicationAddress
+        // tl:397: Sender: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field Sender
-        // tl:418: AssetSender: user
-        load 59                                             // user
+        // tl:398: AssetSender: user
+        load 56                                             // user
         itxn_field AssetSender
-        // tl:419: AssetReceiver: Global.CurrentApplicationAddress
+        // tl:399: AssetReceiver: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field AssetReceiver
-        // tl:420: AssetAmount: amount
-        load 60                                             // amount
+        // tl:400: AssetAmount: amount
+        load 57                                             // amount
         itxn_field AssetAmount
-        // tl:421: XferAsset: app_global_get(STALGO_ASSET_ID_KEY)
+        // tl:401: XferAsset: app_global_get(STALGO_ASSET_ID_KEY)
         pushbytes STALGO_ASSET_ID_KEY                       // "stalgo_asset_id"
         app_global_get
         itxn_field XferAsset
-        // tl:422: Fee: 0
+        // tl:402: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
-    // tl:424: return
+    // tl:404: return
     retsub
 
 
-// tl:428: func check_received_talgo(txn_index: int, amount: int):
+// tl:408: func check_received_talgo(txn_index: int, amount: int):
 __func__check_received_talgo:
-    store 61                                                // amount [int]
-    store 62                                                // txn_index [int]
-    // tl:429: assert(Gtxn[txn_index].TypeEnum == Axfer)
-    load 62                                                 // txn_index
+    store 58                                                // amount [int]
+    store 59                                                // txn_index [int]
+    // tl:409: assert(Gtxn[txn_index].TypeEnum == Axfer)
+    load 59                                                 // txn_index
     gtxns TypeEnum
     pushint 4                                               // Axfer
     ==
     assert
-    // tl:430: assert(Gtxn[txn_index].AssetReceiver == Global.CurrentApplicationAddress)
-    load 62                                                 // txn_index
+    // tl:410: assert(Gtxn[txn_index].AssetReceiver == Global.CurrentApplicationAddress)
+    load 59                                                 // txn_index
     gtxns AssetReceiver
     global CurrentApplicationAddress
     ==
     assert
-    // tl:431: assert(Gtxn[txn_index].AssetAmount == amount)
-    load 62                                                 // txn_index
+    // tl:411: assert(Gtxn[txn_index].AssetAmount == amount)
+    load 59                                                 // txn_index
     gtxns AssetAmount
-    load 61                                                 // amount
+    load 58                                                 // amount
     ==
     assert
-    // tl:432: assert(Gtxn[txn_index].XferAsset == app_global_get(TALGO_ASSET_ID_KEY))
-    load 62                                                 // txn_index
+    // tl:412: assert(Gtxn[txn_index].XferAsset == app_global_get(TALGO_ASSET_ID_KEY))
+    load 59                                                 // txn_index
     gtxns XferAsset
     pushbytes TALGO_ASSET_ID_KEY                            // "talgo_asset_id"
     app_global_get
     ==
     assert
     
-    // tl:434: return
+    // tl:414: return
     retsub
 
 
-// tl:438: func get_account_voting_power(address: bytes[32]) int:
+// tl:418: func get_account_voting_power(address: bytes[32]) int:
 __func__get_account_voting_power:
-    store 63                                                // address [bytes[32]]
-    // tl:439: inner_txn:
+    store 60                                                // address [bytes[32]]
+    // tl:419: inner_txn:
     itxn_begin
-        // tl:440: TypeEnum: Appl
+        // tl:420: TypeEnum: Appl
         pushint 6                                           // Appl
         itxn_field TypeEnum
-        // tl:441: ApplicationID: app_global_get(VAULT_APP_ID_KEY)
+        // tl:421: ApplicationID: app_global_get(VAULT_APP_ID_KEY)
         pushbytes VAULT_APP_ID_KEY                          // "vault_app_id"
         app_global_get
         itxn_field ApplicationID
-        // tl:442: ApplicationArgs[0]: "get_tiny_power_of"
+        // tl:422: ApplicationArgs[0]: "get_tiny_power_of"
         pushbytes "get_tiny_power_of"
         itxn_field ApplicationArgs
-        // tl:443: ApplicationArgs[1]: address
-        load 63                                             // address
+        // tl:423: ApplicationArgs[1]: address
+        load 60                                             // address
         itxn_field ApplicationArgs
-        // tl:444: Fee: 0
+        // tl:424: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
-    // tl:446: int voting_power = extract_uint64(Itxn.LastLog, 4) [slot 64]
+    // tl:426: int voting_power = extract_uint64(Itxn.LastLog, 4) [slot 61]
     itxn LastLog
     pushint 4
     extract_uint64
-    store 64                                                // voting_power
-    // tl:447: return voting_power
-    load 64                                                 // voting_power
+    store 61                                                // voting_power
+    // tl:427: return voting_power
+    load 61                                                 // voting_power
     retsub
 
 
-// tl:451: func opt_in_to_asset(asset_id: int):
+// tl:431: func opt_in_to_asset(asset_id: int):
 __func__opt_in_to_asset:
-    store 65                                                // asset_id [int]
-    // tl:452: inner_txn:
+    store 62                                                // asset_id [int]
+    // tl:432: inner_txn:
     itxn_begin
-        // tl:453: TypeEnum: Axfer
+        // tl:433: TypeEnum: Axfer
         pushint 4                                           // Axfer
         itxn_field TypeEnum
-        // tl:454: Sender: Global.CurrentApplicationAddress
+        // tl:434: Sender: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field Sender
-        // tl:455: AssetReceiver: Global.CurrentApplicationAddress
+        // tl:435: AssetReceiver: Global.CurrentApplicationAddress
         global CurrentApplicationAddress
         itxn_field AssetReceiver
-        // tl:456: AssetAmount: 0
+        // tl:436: AssetAmount: 0
         pushint 0
         itxn_field AssetAmount
-        // tl:457: XferAsset: asset_id
-        load 65                                             // asset_id
+        // tl:437: XferAsset: asset_id
+        load 62                                             // asset_id
         itxn_field XferAsset
-        // tl:458: Fee: 0
+        // tl:438: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
     
-    // tl:461: return
+    // tl:441: return
     retsub
 
