@@ -9,7 +9,6 @@ from algosdk.logic import get_application_address
 from algosdk.account import generate_account
 
 from sdk.base_client import BaseClient
-from sdk.constants import CURRENT_PERIOD_INDEX_KEY, PERIOD_COUNT_KEY
 from sdk.utils import get_struct, get_box_costs
 
 
@@ -60,12 +59,8 @@ class TAlgoStakingClient(BaseClient):
 
         return self._submit(transactions)
 
-    def update_state(self, period_index=None):
+    def update_state(self):
         sp = self.get_suggested_params()
-        current_period_index = self.get_global(CURRENT_PERIOD_INDEX_KEY)
-
-        if period_index is None:
-            period_index = current_period_index
 
         transactions = [
             transaction.ApplicationCallTxn(
@@ -73,10 +68,7 @@ class TAlgoStakingClient(BaseClient):
                 on_complete=transaction.OnComplete.NoOpOC,
                 sp=sp,
                 index=self.app_id,
-                app_args=["update_state", period_index],
-                boxes=[
-                    (0, self.get_reward_period_box_name(period_index))
-                ],
+                app_args=["update_state"],
             )
         ]
 
