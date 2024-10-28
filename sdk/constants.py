@@ -14,6 +14,8 @@ CURRENT_PERIOD_INDEX_KEY = b"current_period_index"
 
 LAST_UPDATE_TIMESTAMP_KEY = b"last_update_timestamp"
 ACCUMULATED_REWARDS_PER_UNIT = b"accumulated_rewards_per_unit"
+LAST_CURRENT_REWARD_RATE_PER_TIME_KEY = b"last_current_reward_rate_per_time"
 CURRENT_REWARD_RATE_PER_TIME_KEY = b"current_reward_rate_per_time"
+CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY = b"current_reward_rate_per_time_end_timestamp"
 TOTAL_STAKED_AMOUNT_KEY = b"total_staked_amount"
 TOTAL_STAKER_COUNT_KEY = b"total_staker_count"
