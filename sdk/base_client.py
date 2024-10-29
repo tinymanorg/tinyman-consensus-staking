@@ -114,8 +114,4 @@ class BaseClient():
                 sp=self.get_suggested_params(),
                 index=asset_id,
             )
-<<<<<<< HEAD
             return txn
-=======
-            return txn
->>>>>>> main
