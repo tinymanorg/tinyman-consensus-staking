@@ -85,7 +85,11 @@ class BaseClient():
         struct_class = get_struct(struct_name)
         struct = struct_class(box_value)
         return struct
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> main
     def box_exists(self, box_name, app_id=None):
         app_id = app_id or self.app_id
         try:
@@ -114,4 +118,8 @@ class BaseClient():
                 sp=self.get_suggested_params(),
                 index=asset_id,
             )
+<<<<<<< HEAD
             return txn
+=======
+            return txn
+>>>>>>> main
