@@ -1,5 +1,5 @@
 from base64 import b64decode, b64encode
-import time
+from datetime import datetime, timezone
 
 from algosdk.encoding import decode_address
 from tinyman.utils import TransactionGroup, int_to_bytes
@@ -9,7 +9,8 @@ from algosdk.logic import get_application_address
 from algosdk.account import generate_account
 
 from sdk.base_client import BaseClient
-from sdk.utils import get_struct, get_box_costs
+from sdk.constants import *
+from sdk.struct import get_struct, get_box_costs
 
 
 UserState = get_struct("UserState")
@@ -45,10 +46,10 @@ class TAlgoStakingClient(BaseClient):
 
         return self._submit(transactions)
 
-    def apply_rate_change(self):
+    def get_apply_rate_change_txn(self):
         sp = self.get_suggested_params()
 
-        transactions = [
+        txn = [
             transaction.ApplicationCallTxn(
                 sender=self.user_address,
                 on_complete=transaction.OnComplete.NoOpOC,
@@ -58,12 +59,26 @@ class TAlgoStakingClient(BaseClient):
             )
         ]
 
+        return txn
+
+    def get_apply_rate_change_txn_if_needed(self):
+        now = datetime.now(tz=timezone.utc).timestamp()
+        current_rate_end_timestamp = self.get_global(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY)
+
+        if current_rate_end_timestamp <= now:
+            return self.get_apply_rate_change_txn()
+
+    def apply_rate_change(self):
+        transactions = [self.get_apply_rate_change_txn()]
+
         return self._submit(transactions)
+
 
     def update_state(self):
         sp = self.get_suggested_params()
 
         transactions = [
+            self.get_apply_rate_change_txn_if_needed(),
             transaction.ApplicationCallTxn(
                 sender=self.user_address,
                 on_complete=transaction.OnComplete.NoOpOC,
@@ -87,20 +102,14 @@ class TAlgoStakingClient(BaseClient):
             new_boxes[user_state_box_name] = UserState
 
         transactions = [
+            self.get_apply_rate_change_txn_if_needed(),
             transaction.PaymentTxn(
                 sender=self.user_address,
                 sp=sp,
                 receiver=self.application_address,
                 amt=self.calculate_min_balance(boxes=new_boxes)
             ) if new_boxes else None,
-            # TODO: add a check
-            transaction.AssetTransferTxn(
-                index=self.stalgo_asset_id,
-                sender=self.user_address,
-                receiver=self.user_address,
-                sp=sp,
-                amt=0
-            ),
+            self.get_optin_if_needed_txn(self.user_address, self.stalgo_asset_id),
             transaction.AssetTransferTxn(
                 index=self.talgo_asset_id,
                 sender=self.user_address,
@@ -130,6 +139,7 @@ class TAlgoStakingClient(BaseClient):
         user_state_box_name = self.get_user_state_box_name(self.user_address)
 
         transactions = [
+            self.get_apply_rate_change_txn_if_needed(),
             transaction.ApplicationCallTxn(
                 sender=self.user_address,
                 on_complete=transaction.OnComplete.NoOpOC,
@@ -150,6 +160,8 @@ class TAlgoStakingClient(BaseClient):
         user_state_box_name = self.get_user_state_box_name(self.user_address)
 
         transactions = [
+            self.get_apply_rate_change_txn_if_needed(),
+            self.get_optin_if_needed_txn(self.user_address, self.tiny_asset_id),
             transaction.ApplicationCallTxn(
                 sender=self.user_address,
                 on_complete=transaction.OnComplete.NoOpOC,
@@ -163,4 +175,4 @@ class TAlgoStakingClient(BaseClient):
             )
         ]
 
-        return self._submit(transactions, additional_fees=1)
+        return self._submit(transactions, additional_fees=2)

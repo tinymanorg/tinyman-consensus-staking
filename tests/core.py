@@ -135,6 +135,7 @@ class BaseTestCase(unittest.TestCase):
         self.ledger.global_states[self.app_id][LAST_CURRENT_REWARD_RATE_PER_TIME_KEY] = self.ledger.global_states[self.app_id].get(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
         self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_KEY] = reward_rate_per_time
         self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY] = end_timestamp
+        self.ledger.set_account_balance(self.application_address, total_reward_amount, self.tiny_asset_id)
 
     def simulate_user_voting_power(self, account_address=None, locked_amount=1000, lock_end_time=None):
         now = int(datetime.now(tz=timezone.utc).timestamp())
