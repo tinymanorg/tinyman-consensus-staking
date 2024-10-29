@@ -15,7 +15,7 @@ from tests.constants import *
 from tests.utils import JigAlgod
 
 
-class BaseTestCase(unittest.TestCase):
+class TalgoStakingBaseTestCase(unittest.TestCase):
     maxDiff = None
 
     @classmethod

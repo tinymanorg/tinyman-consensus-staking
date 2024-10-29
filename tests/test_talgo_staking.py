@@ -20,11 +20,11 @@ from sdk.event import decode_logs
 from sdk.events import restaking_events
 
 from tests.constants import talgo_staking_approval_program, talgo_staking_clear_state_program, WEEK, DAY
-from tests.core import BaseTestCase
+from tests.core import TalgoStakingBaseTestCase
 from tests.constants import APP_LOCAL_INTS, APP_LOCAL_BYTES, APP_GLOBAL_INTS, APP_GLOBAL_BYTES, EXTRA_PAGES
 
 
-class TAlgoStakingTests(BaseTestCase):
+class TAlgoStakingTests(TalgoStakingBaseTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
