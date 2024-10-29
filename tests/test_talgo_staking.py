@@ -198,12 +198,12 @@ class TAlgoStakingTests(BaseTestCase):
         block = self.ledger.last_block
         block_txns = block[b"txns"]
 
-        claim_rewards_transaction = block_txns[0]
-        breakpoint()
-        # events = decode_logs(claim_rewards_transaction[b"dt"][b"lg"], restaking_events)
-        reward_transfer_itx = claim_rewards_transaction[b"dt"][b"itx"]
+        claim_rewards_transaction = block_txns[1]
+        reward_transfer_itx = claim_rewards_transaction[b"dt"][b"itx"][0]
 
         self.assertEqual(reward_transfer_itx[b"txn"][b"xaid"], self.tiny_asset_id)
-        self.assertTrue(reward_transfer_itx[b"txn"][b"amt"] > 0)
+        self.assertEqual(encode_address(reward_transfer_itx[b"txn"][b"arcv"]), self.user_address)
+        self.assertTrue(reward_transfer_itx[b"txn"][b"aamt"] > 0)
 
         user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")
+        self.assertEqual(user_state.accumulated_rewards, 0)
