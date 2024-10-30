@@ -110,7 +110,7 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
                 "clawback": self.application_address,
                 "creator": self.application_address,
                 "decimals": 6,
-                "default-frozen": True,
+                "default_frozen": True,
                 "freeze": self.application_address,
                 "name": "Staked tALGO",
                 "name-b64": "U3Rha2VkIHRBTEdP",
@@ -122,7 +122,7 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
                 "url-b64": "aHR0cHM6Ly90aW55bWFuLm9yZw=="
             }
         )
-        self.ledger.global_states[self.app_id][b"stalgo_asset_id"] = self.stalgo_asset_id
+        self.ledger.global_states[self.app_id][STALGO_ASSET_ID_KEY] = self.stalgo_asset_id
 
     def set_reward_rate(self, total_reward_amount=10_000_000, start_timestamp=None, end_timestamp=None):
         if not (start_timestamp and end_timestamp):
@@ -160,8 +160,8 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
 
         self.ledger.set_box(self.app_id, key=decode_address(account_address), value=user_state._data)
         self.ledger.set_account_balance(self.application_address, staked_amount, self.talgo_asset_id)
-        self.ledger.set_account_balance(account_address, 0, self.talgo_asset_id)        
-        self.ledger.set_account_balance(account_address, staked_amount, self.stalgo_asset_id)
+        self.ledger.set_account_balance(account_address, 0, self.talgo_asset_id) 
+        self.ledger.set_account_balance(account_address, staked_amount, self.stalgo_asset_id, frozen=True)
 
         # Global State Updates
         self.ledger.global_states[self.app_id][b"total_staked_amount"] = self.ledger.global_states[self.app_id].get(b"total_staked_amount", 0) + staked_amount

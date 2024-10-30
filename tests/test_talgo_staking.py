@@ -162,7 +162,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
         user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")
         self.assertEqual(user_state.staked_amount, 100_000)
         self.assertEqual(user_state.timestamp, now)
-        # self.assertEqual(self.ledger.get_account_balance(self.user_address, self.stalgo_asset_id), [100_000, True])
+        self.assertEqual(self.ledger.get_account_balance(self.user_address, self.stalgo_asset_id), [100_000, True])
 
     def test_decrease_stake(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -181,6 +181,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
         user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")
         self.assertEqual(user_state.staked_amount, 0)
         self.assertEqual(user_state.timestamp, now + WEEK)
+        self.assertEqual(self.ledger.get_account_balance(self.user_address, self.stalgo_asset_id), [0, True])
 
     def test_claim_rewards(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)

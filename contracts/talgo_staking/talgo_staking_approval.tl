@@ -272,8 +272,6 @@ func increase_stake(amount: int):
     check_received_talgo(Txn.GroupIndex - 1, amount)
     user_state.staked_amount = user_state.staked_amount + amount
 
-    send_stalgo(amount, Txn.Sender)
-
     if !user_state.staked_amount:
         current_tiny_power = get_account_voting_power(Txn.Sender)
         assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))
@@ -282,6 +280,8 @@ func increase_stake(amount: int):
         total_staker_count = total_staker_count + 1
         app_global_put(TOTAL_STAKER_COUNT_KEY, total_staker_count)
     end
+
+    send_stalgo(amount, Txn.Sender)
 
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
     total_staked_amount = total_staked_amount + amount
@@ -357,6 +357,7 @@ func send_stalgo(amount: int, receiver: bytes[32]):
     inner_txn:
         TypeEnum: Axfer
         Sender: Global.CurrentApplicationAddress
+        AssetSender: Global.CurrentApplicationAddress
         AssetReceiver: receiver
         AssetAmount: amount
         XferAsset: app_global_get(STALGO_ASSET_ID_KEY)
