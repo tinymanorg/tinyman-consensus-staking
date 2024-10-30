@@ -130,7 +130,7 @@ func init():
     app_global_put("account_3", create_auxiliary_account())
     app_global_put("account_4", create_auxiliary_account())
 
-    log(ARC28Event("init(int,address,address,address,address,address)", itob(talgo_asset_id), app_global_get("account_0"), app_global_get("account_1"), app_global_get("account_2"), app_global_get("account_3"), app_global_get("account_4")))
+    log(ARC28Event("init(uint64,address,address,address,address,address)", itob(talgo_asset_id), app_global_get("account_0"), app_global_get("account_1"), app_global_get("account_2"), app_global_get("account_3"), app_global_get("account_4")))
     return
 end
 
@@ -147,7 +147,7 @@ func mint(algo_amount: int):
     assert(balance(app_global_get("account_0")) < MAX_ACCOUNT_BALANCE)
     # 1. Update state to account for rewards received since the last operation
     update_rewards_and_rate(algo_amount)
-    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
+    log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     # 2. Calculate the amount of tAlgo for the given Algo
     int talgo_amount = calc_talgo(algo_amount)
     # 3. Update the tracked tAlgo & Algo amounts
@@ -155,7 +155,7 @@ func mint(algo_amount: int):
     app_global_put("algo_balance", app_global_get("algo_balance") + algo_amount)
     # 4. Transfer the tAlgo
     transfer_talgo(Txn.Sender, talgo_amount)
-    log(ARC28Event("mint(address,int,int)", itob(algo_amount), itob(talgo_amount)))
+    log(ARC28Event("mint(address,uint64,uint64)", Txn.Sender, itob(algo_amount), itob(talgo_amount)))
     return
 end
 
@@ -168,7 +168,7 @@ func burn(talgo_amount: int):
     assert(Gtxn[-1].XferAsset == app_global_get("talgo_asset_id"))
     # 1. Update state to account for rewards received since the last operation
     update_rewards_and_rate(0)
-    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
+    log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     # 2. Calculate the amount of Algo for the given tAlgo
     int algo_amount = calc_algo(talgo_amount)
     # 3. Update the tracked tAlgo & Algo amounts
@@ -176,7 +176,7 @@ func burn(talgo_amount: int):
     app_global_put("algo_balance", app_global_get("algo_balance") - algo_amount)
     # 4. Transfer the Algo
     transfer_algo(Txn.Sender, algo_amount)
-    log(ARC28Event("burn(address,int,int)", itob(talgo_amount), itob(algo_amount)))
+    log(ARC28Event("burn(address,uint64,uint64)", Txn.Sender, itob(talgo_amount), itob(algo_amount)))
     return
 end
 
@@ -185,7 +185,7 @@ end
 @public()
 func claim_protocol_rewards():
     transfer_talgo(UncheckedCast(app_global_get("fee_collector"), bytes[32]), app_global_get("protocol_talgo"))
-    log(ARC28Event("claim_protocol_rewards(int)", itob(app_global_get("protocol_talgo"))))
+    log(ARC28Event("claim_protocol_rewards(uint64)", itob(app_global_get("protocol_talgo"))))
     return
 end
 
@@ -198,7 +198,7 @@ end
 @public()
 func sync():
     update_rewards_and_rate(0)
-    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
+    log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     return
 end
 
@@ -223,7 +223,7 @@ func set_node_manager(node_index: int, new_node_manager: bytes[32]):
 
     bytes key = concat("node_manager_", ascii_digit(node_index))
     app_global_put(key, new_node_manager)
-    log(ARC28Event("set_node_manager(int,address)", itob(node_index), new_node_manager))
+    log(ARC28Event("set_node_manager(uint64,address)", itob(node_index), new_node_manager))
     return
 end
 
@@ -259,7 +259,7 @@ func set_protocol_fee(fee_amount: int):
     assert(user_address == app_global_get("manager"))
 
     app_global_put("protocol_fee", fee_amount)
-    log(ARC28Event("set_protocol_fee(int)", fee_amount))
+    log(ARC28Event("set_protocol_fee(uint64)", fee_amount))
     return
 end
 
@@ -291,7 +291,7 @@ func change_online_status(node_index: int):
         RekeyTo: KEY_REG_LOGIC_SIG_ADDRESS
         Fee: 0
     end
-    log(ARC28Event("change_online_status(int)", itob(node_index)))
+    log(ARC28Event("change_online_status(uint64)", itob(node_index)))
     return
 end
 
@@ -309,7 +309,7 @@ func move_stake(from_index: int, to_index: int, amount: int):
         Amount: amount
         Fee: 0
     end
-    log(ARC28Event("move_stake(int,int,int)", itob(from_index), itob(to_index), itob(amount)))
+    log(ARC28Event("move_stake(uint64,uint64,uint64)", itob(from_index), itob(to_index), itob(amount)))
     return
 end
 
