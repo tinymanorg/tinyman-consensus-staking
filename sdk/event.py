@@ -69,6 +69,8 @@ class Event:
 def get_event_by_log(log: bytes, events: list[Event]):
     event_selector = log[:4]
     events_filtered = [event for event in events if event.selector == event_selector]
+    if not events_filtered:
+        return None
     assert len(events_filtered) == 1
     event = events_filtered[0]
     return event
@@ -76,9 +78,8 @@ def get_event_by_log(log: bytes, events: list[Event]):
 
 def decode_logs(logs: list[bytes], events: list[Event]):
     decoded_logs = []
-
     for log in logs:
         event = get_event_by_log(log, events)
-        decoded_logs.append(event.decode(log))
-
+        if event:
+            decoded_logs.append(event.decode(log))
     return decoded_logs

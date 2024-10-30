@@ -93,3 +93,39 @@ claim_rewards_event = Event(
         abi.Argument(arg_type="uint64", name="amount"),
     ]
 )
+
+
+
+rate_update_event = Event(
+    name="rate_update",
+    args=[
+        abi.Argument(arg_type="uint64", name="rate"),
+    ]
+)
+
+
+mint_event = Event(
+    name="mint",
+    args=[
+        abi.Argument(arg_type="address", name="user_address"),
+        abi.Argument(arg_type="uint64", name="algo_amount"),
+        abi.Argument(arg_type="uint64", name="talgo_amount"),
+    ]
+)
+
+
+burn_event = Event(
+    name="burn",
+    args=[
+        abi.Argument(arg_type="address", name="user_address"),
+        abi.Argument(arg_type="uint64", name="talgo_amount"),
+        abi.Argument(arg_type="uint64", name="algo_amount"),
+    ]
+)
+
+
+talgo_events = [
+    rate_update_event,
+    mint_event,
+    burn_event,
+]

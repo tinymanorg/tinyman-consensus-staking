@@ -15,10 +15,12 @@ from algosdk.encoding import decode_address, encode_address
 from algosdk.logic import get_application_address
 from algosdk.transaction import OnComplete
 from algosdk.constants import ZERO_ADDRESS
+from sdk.event import decode_logs
 from tinyman.utils import bytes_to_int, TransactionGroup, int_to_bytes
 from tests.utils import JigAlgod
 
 from sdk.talgo_client import TAlgoClient
+from sdk.events import talgo_events
 
 
 APP_LOCAL_INTS = 0
@@ -29,6 +31,8 @@ EXTRA_PAGES = 1
 
 talgo_approval_program = TealishProgram('contracts/talgo/talgo.tl')
 talgo_clear_state_program = TealishProgram('contracts/talgo/clear_state.tl')
+
+RATE_SCALER = int(1e12)
 
 
 class TestSetup(unittest.TestCase):
@@ -122,42 +126,193 @@ class TestSetup(unittest.TestCase):
     def test_init(self):
         self.t_algo_client.init()
 
-    def test_mint(self):
+    def test_mint_only(self):
         self.t_algo_client.init()
-        for x in range(5):
-            # self.t_algo_client.mint(2_000_000)
-            self.t_algo_client.mint(int(10e12))
-            print_logs(self.ledger.last_block[b'txns'][2][b'dt'][b'lg'])
-            print("rate", self.t_algo_client.get_global(b"rate"))
-            print("minted_talgo", self.t_algo_client.get_global(b"minted_talgo"))
-            print("algo_balance", self.t_algo_client.get_global(b"algo_balance"))
-            print("total_rewards", self.t_algo_client.get_global(b"total_rewards"))
-            print("protocol_talgo", self.t_algo_client.get_global(b"protocol_talgo"))
-            print()
+        talgo_asset_id = self.t_algo_client.get_global(b"talgo_asset_id")
+        expected_algo_balance = 0
+        expected_minted_talgo = 0
+        algo_amount = int(10e12)
+        expected_rate = 1 * RATE_SCALER
+        expected_talgo_amount = algo_amount * RATE_SCALER / expected_rate
+        expected_algo_balance += algo_amount
+        expected_minted_talgo += expected_talgo_amount
+        self.t_algo_client.mint(algo_amount)
+        logs = self.ledger.last_block[b'txns'][2][b'dt'][b'lg']
+        events = decode_logs(logs, talgo_events)
+        self.assertEqual(events[0]["rate"], expected_rate)
+        self.assertEqual(events[1]["user_address"], self.user_address)
+        self.assertEqual(events[1]["algo_amount"], algo_amount)
+        self.assertEqual(events[1]["talgo_amount"], expected_talgo_amount)
+        self.assertEqual(self.t_algo_client.get_global(b"rate"), expected_rate)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), expected_algo_balance)
+        self.assertEqual(self.t_algo_client.get_global(b"minted_talgo"), expected_minted_talgo)
+        self.assertEqual(self.t_algo_client.get_global(b"total_rewards"), 0)
+        self.assertEqual(self.t_algo_client.get_global(b"protocol_talgo"), 0)
 
-        for x in range(5):
-            self.ledger.add(self.application_address, 1000)
-            self.t_algo_client.sync()
-            print("rate", self.t_algo_client.get_global(b"rate"))
-            print("minted_talgo", self.t_algo_client.get_global(b"minted_talgo"))
-            print("algo_balance", self.t_algo_client.get_global(b"algo_balance"))
-            print("total_rewards", self.t_algo_client.get_global(b"total_rewards"))
-            print("protocol_talgo", self.t_algo_client.get_global(b"protocol_talgo"))
-            asset_id = self.t_algo_client.get_global(b"talgo_asset_id")
-            print("user talgo", self.ledger.get_account_balance(self.t_algo_client.user_address, asset_id)[0])
-            print()
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), int(10e12))
+        self.assertEqual(self.ledger.get_account_balance(self.t_algo_client.user_address, talgo_asset_id)[0], expected_talgo_amount)
 
-        for x in range(5):
-            self.t_algo_client.burn(2_000_000)
-            print_logs(self.ledger.last_block[b'txns'][1][b'dt'][b'lg'])
-            print(self.ledger.get_account_balance(self.t_algo_client.user_address, asset_id)[0])
-            print("rate", self.t_algo_client.get_global(b"rate"))
-            print("minted_talgo", self.t_algo_client.get_global(b"minted_talgo"))
-            print("algo_balance", self.t_algo_client.get_global(b"algo_balance"))
-            print("total_rewards", self.t_algo_client.get_global(b"total_rewards"))
-            print("protocol_talgo", self.t_algo_client.get_global(b"protocol_talgo"))
-            print("user talgo", self.ledger.get_account_balance(self.t_algo_client.user_address, asset_id)[0])
-            print()
+
+    def test_mint_and_rewards(self):
+        self.t_algo_client.init()
+        self.ledger.update_global_state(self.app_id, {b"protocol_fee": 0})
+        talgo_asset_id = self.t_algo_client.get_global(b"talgo_asset_id")
+        expected_algo_balance = 0
+        expected_minted_talgo = 0
+        expected_user_talgo_balance = 0
+
+        # Mint 10M Algo
+        algo_amount = int(10e12)
+        expected_rate = 1 * RATE_SCALER
+        expected_talgo_amount = int(algo_amount * RATE_SCALER / expected_rate)
+        expected_algo_balance += algo_amount
+        expected_minted_talgo += expected_talgo_amount
+        expected_user_talgo_balance += expected_talgo_amount
+        self.t_algo_client.mint(algo_amount)
+
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), algo_amount)
+
+        # Add 1 Algo reward to account
+        reward = 1_000_000
+        self.ledger.add(self.application_address, reward)
+        self.t_algo_client.sync()
+
+        expected_algo_balance += reward
+        expected_rate = int((expected_algo_balance * RATE_SCALER) / expected_minted_talgo)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), expected_algo_balance)
+        self.assertAlmostEqual(self.t_algo_client.get_global(b"rate"), expected_rate, delta=0)
+        self.assertEqual(self.t_algo_client.get_global(b"protocol_talgo"), 0)
+
+        # Mint 10M Algo
+        algo_amount = int(10e12)
+        expected_talgo_amount = int(algo_amount * RATE_SCALER / expected_rate)
+        expected_algo_balance += algo_amount
+        expected_minted_talgo += expected_talgo_amount
+        expected_user_talgo_balance += expected_talgo_amount
+        self.t_algo_client.mint(algo_amount)
+
+        self.assertAlmostEqual(self.t_algo_client.get_global(b"rate"), expected_rate, delta=1)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), expected_algo_balance)
+        self.assertEqual(self.t_algo_client.get_global(b"minted_talgo"), expected_minted_talgo)
+
+        self.assertEqual(self.ledger.get_account_balance(self.t_algo_client.user_address, talgo_asset_id)[0], expected_user_talgo_balance)
+
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), int(20_000_001e6))
+
+    def test_mint_and_rewards_with_fee(self):
+        self.t_algo_client.init()
+        self.ledger.update_global_state(self.app_id, {b"protocol_fee": 10})
+        talgo_asset_id = self.t_algo_client.get_global(b"talgo_asset_id")
+        expected_algo_balance = 0
+        expected_minted_talgo = 0
+        expected_user_talgo_balance = 0
+
+        # Mint 10M Algo
+        algo_amount = int(10e12)
+        expected_rate = 1 * RATE_SCALER
+        expected_talgo_amount = int(algo_amount * RATE_SCALER / expected_rate)
+        expected_algo_balance += algo_amount
+        expected_minted_talgo += expected_talgo_amount
+        expected_user_talgo_balance += expected_talgo_amount
+        self.t_algo_client.mint(algo_amount)
+
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), algo_amount)
+
+        # Add 1 Algo reward to account
+        reward = 1_000_000
+        self.ledger.add(self.application_address, reward)
+        self.t_algo_client.sync()
+
+        # Assign 100_000 for protocol fees
+        # 900_000 for rewards
+        # update rate (+900_000 Algo)
+        # mint (100_000 Algo)
+
+        expected_algo_balance += reward
+        protocol_fee = 100_000
+        expected_rate = int(((expected_algo_balance - protocol_fee) * RATE_SCALER) / expected_minted_talgo)
+        expected_protocol_talgo = int(protocol_fee * RATE_SCALER / expected_rate)
+        expected_minted_talgo += expected_protocol_talgo
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), expected_algo_balance)
+        self.assertAlmostEqual(self.t_algo_client.get_global(b"rate"), expected_rate, delta=0)
+        self.assertEqual(self.t_algo_client.get_global(b"minted_talgo"), expected_minted_talgo)
+        self.assertEqual(self.t_algo_client.get_global(b"protocol_talgo"), expected_protocol_talgo)
+
+        # Mint 10M Algo
+        algo_amount = int(10e12)
+        expected_talgo_amount = int(algo_amount * RATE_SCALER / expected_rate)
+        expected_algo_balance += algo_amount
+        expected_minted_talgo += expected_talgo_amount
+        expected_user_talgo_balance += expected_talgo_amount
+        self.t_algo_client.mint(algo_amount)
+
+        self.assertAlmostEqual(self.t_algo_client.get_global(b"rate"), expected_rate, delta=1)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), expected_algo_balance)
+        self.assertEqual(self.t_algo_client.get_global(b"minted_talgo"), expected_minted_talgo)
+
+        self.assertEqual(self.ledger.get_account_balance(self.t_algo_client.user_address, talgo_asset_id)[0], expected_user_talgo_balance)
+
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), int(20_000_001e6))
+
+    def test_mint_and_burn_full(self):
+        self.t_algo_client.init()
+        talgo_asset_id = self.t_algo_client.get_global(b"talgo_asset_id")
+        expected_algo_balance = 0
+        expected_minted_talgo = 0
+        algo_amount = int(10e12)
+        expected_rate = 1 * RATE_SCALER
+        expected_talgo_amount = int(algo_amount * RATE_SCALER / expected_rate)
+        expected_algo_balance += algo_amount
+        expected_minted_talgo += expected_talgo_amount
+        self.t_algo_client.mint(algo_amount)
+
+        self.t_algo_client.burn(expected_talgo_amount)
+        logs = self.ledger.last_block[b'txns'][1][b'dt'][b'lg']
+        events = decode_logs(logs, talgo_events)
+        self.assertEqual(events[0]["rate"], expected_rate)
+        self.assertEqual(events[1]["user_address"], self.user_address)
+        self.assertEqual(events[1]["algo_amount"], algo_amount)
+        self.assertEqual(events[1]["talgo_amount"], expected_talgo_amount)
+        self.assertEqual(self.t_algo_client.get_global(b"rate"), expected_rate)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), 0)
+        self.assertEqual(self.t_algo_client.get_global(b"minted_talgo"), 0)
+        self.assertEqual(self.t_algo_client.get_global(b"total_rewards"), 0)
+        self.assertEqual(self.t_algo_client.get_global(b"protocol_talgo"), 0)
+
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), int(0))
+        self.assertEqual(self.ledger.get_account_balance(self.t_algo_client.user_address, talgo_asset_id)[0], 0)
+
+    def test_mint_and_burn_half(self):
+        self.t_algo_client.init()
+        talgo_asset_id = self.t_algo_client.get_global(b"talgo_asset_id")
+        expected_algo_balance = 0
+        expected_minted_talgo = 0
+        algo_amount = int(10e12)
+        expected_rate = 1 * RATE_SCALER
+        expected_talgo_amount = int(algo_amount * RATE_SCALER / expected_rate)
+        expected_algo_balance += algo_amount
+        expected_minted_talgo += expected_talgo_amount
+        self.t_algo_client.mint(algo_amount)
+
+        half_talgo_amount = int(expected_talgo_amount / 2)
+        half_algo_amount = int(algo_amount / 2)
+
+
+        self.t_algo_client.burn(half_talgo_amount)
+        logs = self.ledger.last_block[b'txns'][1][b'dt'][b'lg']
+        events = decode_logs(logs, talgo_events)
+        self.assertEqual(events[0]["rate"], expected_rate)
+        self.assertEqual(events[1]["user_address"], self.user_address)
+        self.assertEqual(events[1]["algo_amount"], half_algo_amount)
+        self.assertEqual(events[1]["talgo_amount"], half_talgo_amount)
+        self.assertEqual(self.t_algo_client.get_global(b"rate"), expected_rate)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), half_algo_amount)
+        self.assertEqual(self.t_algo_client.get_global(b"minted_talgo"), half_talgo_amount)
+        self.assertEqual(self.t_algo_client.get_global(b"total_rewards"), 0)
+        self.assertEqual(self.t_algo_client.get_global(b"protocol_talgo"), 0)
+
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), int(half_algo_amount))
+        self.assertEqual(self.ledger.get_account_balance(self.t_algo_client.user_address, talgo_asset_id)[0], half_talgo_amount)
 
     def test_go_online(self):
         self.ledger.set_global_state(self.app_id, {"node_manager_1": decode_address(self.user_address)})
