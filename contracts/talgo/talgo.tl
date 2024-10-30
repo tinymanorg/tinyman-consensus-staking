@@ -15,7 +15,7 @@
 const int TALGO_TOTAL_SUPPLY = 10_000_000_000_000_000
 
 # The rate of Algo/tAlgo is scaled by this value for integer storage and calculation
-const int RATE_SCALER = 1_000_000
+const int RATE_SCALER = 1_000_000_000_000
 
 # The Algorand protocol limit is 70M Algo per online account to remain eligible for proposer rewards. 
 # We set 69M to allow space for rewards to accumulate.
