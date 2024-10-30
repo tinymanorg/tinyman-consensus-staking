@@ -119,6 +119,8 @@ func init():
     app_global_put("minted_talgo", 0)
     app_global_put("algo_balance", 0)
     app_global_put("rate", 1 * RATE_SCALER)
+    app_global_put("total_rewards", 0)
+    app_global_put("protocol_talgo", 0)
 
     # Set the 5 accounts used for stake
     # The first is the application account
@@ -325,6 +327,10 @@ end
 
 
 func update_rewards_and_rate(delta: int):
+    int minted_talgo = app_global_get("minted_talgo")
+    if !minted_talgo:
+        return
+    end
     # delta is the additional balance transferred in this txn group that we want to ignore for now
     # we are only interested in calculating rewards/donations since the last txn 
     int algo_balance = full_balance() - delta
@@ -334,23 +340,22 @@ func update_rewards_and_rate(delta: int):
 
     # Calculate the amount of Algo owed to the protocol according to "protocol_fee"
     int protocol_rewards = (new_rewards * app_global_get("protocol_fee")) / 100
-    # Convert the protocol fee to talgo immediately as it will stay staked and earn rewards
+
+    # Update the rate to account for the new rewards
+    # The new protocol fee Algo must be subtracted as it is not part of the rewards to the tAlgo holders
+    # int rate = (algo_balance * RATE_SCALER) / minted_talgo
+    # use wide math otherwise any algo_balance over approx 18M would cause an overflow
+    int rate = btoi((itob(algo_balance - protocol_rewards) b* itob(RATE_SCALER)) b/ itob(minted_talgo))
+    app_global_put("rate", rate)
+
+    # Now convert the protocol fee Algo to tAlgo (at the new rate) as it will stay staked and earn rewards
     int protocol_talgo = app_global_get("protocol_talgo")
     int new_protocol_talgo = calc_talgo(protocol_rewards) 
     protocol_talgo = protocol_talgo + new_protocol_talgo
     app_global_put("protocol_talgo", protocol_talgo)
 
-    int minted_talgo = app_global_get("minted_talgo")
     minted_talgo = minted_talgo + new_protocol_talgo
     app_global_put("minted_talgo", minted_talgo)
-    if minted_talgo:
-        # int rate = (algo_balance * RATE_SCALER) / minted_talgo
-        # use wide math otherwise any algo_balance over approx 18M would cause an overflow
-        int rate = btoi((itob(algo_balance) b* itob(RATE_SCALER)) b/ itob(minted_talgo))
-        app_global_put("rate", rate)
-    else:
-        app_global_put("rate", 1 * RATE_SCALER)
-    end
     return
 end
 
