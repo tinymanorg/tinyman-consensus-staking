@@ -15,7 +15,7 @@
 const int TALGO_TOTAL_SUPPLY = 10_000_000_000_000_000
 
 # The rate of Algo/tAlgo is scaled by this value for integer storage and calculation
-const int RATE_SCALER = 1_000_000
+const int RATE_SCALER = 1_000_000_000_000
 
 # The Algorand protocol limit is 70M Algo per online account to remain eligible for proposer rewards. 
 # We set 69M to allow space for rewards to accumulate.
@@ -119,6 +119,8 @@ func init():
     app_global_put("minted_talgo", 0)
     app_global_put("algo_balance", 0)
     app_global_put("rate", 1 * RATE_SCALER)
+    app_global_put("total_rewards", 0)
+    app_global_put("protocol_talgo", 0)
 
     # Set the 5 accounts used for stake
     # The first is the application account
@@ -130,7 +132,7 @@ func init():
     app_global_put("account_3", create_auxiliary_account())
     app_global_put("account_4", create_auxiliary_account())
 
-    log(ARC28Event("init(int,address,address,address,address,address)", itob(talgo_asset_id), app_global_get("account_0"), app_global_get("account_1"), app_global_get("account_2"), app_global_get("account_3"), app_global_get("account_4")))
+    log(ARC28Event("init(uint64,address,address,address,address,address)", itob(talgo_asset_id), app_global_get("account_0"), app_global_get("account_1"), app_global_get("account_2"), app_global_get("account_3"), app_global_get("account_4")))
     return
 end
 
@@ -147,7 +149,7 @@ func mint(algo_amount: int):
     assert(balance(app_global_get("account_0")) < MAX_ACCOUNT_BALANCE)
     # 1. Update state to account for rewards received since the last operation
     update_rewards_and_rate(algo_amount)
-    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
+    log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     # 2. Calculate the amount of tAlgo for the given Algo
     int talgo_amount = calc_talgo(algo_amount)
     # 3. Update the tracked tAlgo & Algo amounts
@@ -155,7 +157,7 @@ func mint(algo_amount: int):
     app_global_put("algo_balance", app_global_get("algo_balance") + algo_amount)
     # 4. Transfer the tAlgo
     transfer_talgo(Txn.Sender, talgo_amount)
-    log(ARC28Event("mint(address,int,int)", itob(algo_amount), itob(talgo_amount)))
+    log(ARC28Event("mint(address,uint64,uint64)", Txn.Sender, itob(algo_amount), itob(talgo_amount)))
     return
 end
 
@@ -168,7 +170,7 @@ func burn(talgo_amount: int):
     assert(Gtxn[-1].XferAsset == app_global_get("talgo_asset_id"))
     # 1. Update state to account for rewards received since the last operation
     update_rewards_and_rate(0)
-    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
+    log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     # 2. Calculate the amount of Algo for the given tAlgo
     int algo_amount = calc_algo(talgo_amount)
     # 3. Update the tracked tAlgo & Algo amounts
@@ -176,7 +178,7 @@ func burn(talgo_amount: int):
     app_global_put("algo_balance", app_global_get("algo_balance") - algo_amount)
     # 4. Transfer the Algo
     transfer_algo(Txn.Sender, algo_amount)
-    log(ARC28Event("burn(address,int,int)", itob(talgo_amount), itob(algo_amount)))
+    log(ARC28Event("burn(address,uint64,uint64)", Txn.Sender, itob(talgo_amount), itob(algo_amount)))
     return
 end
 
@@ -185,7 +187,7 @@ end
 @public()
 func claim_protocol_rewards():
     transfer_talgo(UncheckedCast(app_global_get("fee_collector"), bytes[32]), app_global_get("protocol_talgo"))
-    log(ARC28Event("claim_protocol_rewards(int)", itob(app_global_get("protocol_talgo"))))
+    log(ARC28Event("claim_protocol_rewards(uint64)", itob(app_global_get("protocol_talgo"))))
     return
 end
 
@@ -198,7 +200,7 @@ end
 @public()
 func sync():
     update_rewards_and_rate(0)
-    log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
+    log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     return
 end
 
@@ -223,7 +225,7 @@ func set_node_manager(node_index: int, new_node_manager: bytes[32]):
 
     bytes key = concat("node_manager_", ascii_digit(node_index))
     app_global_put(key, new_node_manager)
-    log(ARC28Event("set_node_manager(int,address)", itob(node_index), new_node_manager))
+    log(ARC28Event("set_node_manager(uint64,address)", itob(node_index), new_node_manager))
     return
 end
 
@@ -259,7 +261,7 @@ func set_protocol_fee(fee_amount: int):
     assert(user_address == app_global_get("manager"))
 
     app_global_put("protocol_fee", fee_amount)
-    log(ARC28Event("set_protocol_fee(int)", fee_amount))
+    log(ARC28Event("set_protocol_fee(uint64)", fee_amount))
     return
 end
 
@@ -291,7 +293,7 @@ func change_online_status(node_index: int):
         RekeyTo: KEY_REG_LOGIC_SIG_ADDRESS
         Fee: 0
     end
-    log(ARC28Event("change_online_status(int)", itob(node_index)))
+    log(ARC28Event("change_online_status(uint64)", itob(node_index)))
     return
 end
 
@@ -309,7 +311,7 @@ func move_stake(from_index: int, to_index: int, amount: int):
         Amount: amount
         Fee: 0
     end
-    log(ARC28Event("move_stake(int,int,int)", itob(from_index), itob(to_index), itob(amount)))
+    log(ARC28Event("move_stake(uint64,uint64,uint64)", itob(from_index), itob(to_index), itob(amount)))
     return
 end
 
@@ -325,6 +327,10 @@ end
 
 
 func update_rewards_and_rate(delta: int):
+    int minted_talgo = app_global_get("minted_talgo")
+    if !minted_talgo:
+        return
+    end
     # delta is the additional balance transferred in this txn group that we want to ignore for now
     # we are only interested in calculating rewards/donations since the last txn 
     int algo_balance = full_balance() - delta
@@ -334,23 +340,22 @@ func update_rewards_and_rate(delta: int):
 
     # Calculate the amount of Algo owed to the protocol according to "protocol_fee"
     int protocol_rewards = (new_rewards * app_global_get("protocol_fee")) / 100
-    # Convert the protocol fee to talgo immediately as it will stay staked and earn rewards
+
+    # Update the rate to account for the new rewards
+    # The new protocol fee Algo must be subtracted as it is not part of the rewards to the tAlgo holders
+    # int rate = (algo_balance * RATE_SCALER) / minted_talgo
+    # use wide math otherwise any algo_balance over approx 18M would cause an overflow
+    int rate = btoi((itob(algo_balance - protocol_rewards) b* itob(RATE_SCALER)) b/ itob(minted_talgo))
+    app_global_put("rate", rate)
+
+    # Now convert the protocol fee Algo to tAlgo (at the new rate) as it will stay staked and earn rewards
     int protocol_talgo = app_global_get("protocol_talgo")
     int new_protocol_talgo = calc_talgo(protocol_rewards) 
     protocol_talgo = protocol_talgo + new_protocol_talgo
     app_global_put("protocol_talgo", protocol_talgo)
 
-    int minted_talgo = app_global_get("minted_talgo")
     minted_talgo = minted_talgo + new_protocol_talgo
     app_global_put("minted_talgo", minted_talgo)
-    if minted_talgo:
-        # int rate = (algo_balance * RATE_SCALER) / minted_talgo
-        # use wide math otherwise any algo_balance over approx 18M would cause an overflow
-        int rate = btoi((itob(algo_balance) b* itob(RATE_SCALER)) b/ itob(minted_talgo))
-        app_global_put("rate", rate)
-    else:
-        app_global_put("rate", 1 * RATE_SCALER)
-    end
     return
 end
 
