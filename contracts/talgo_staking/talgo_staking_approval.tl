@@ -17,14 +17,14 @@ const bytes TINY_ASSET_ID_KEY = "tiny_asset_id"
 const bytes TALGO_ASSET_ID_KEY = "talgo_asset_id"
 const bytes STALGO_ASSET_ID_KEY = "stalgo_asset_id"
 
+const int MAX_RATE_INCREMENT_PERCENTAGE = 10
 const bytes LAST_REWARD_RATE_PER_TIME_KEY = "last_reward_rate_per_time"
 const bytes CURRENT_REWARD_RATE_PER_TIME_KEY = "current_reward_rate_per_time"
 const bytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY = "current_reward_rate_per_time_end_timestamp"
-const int MAX_RATE_INCREMENT_PERCENTAGE = 10
+const bytes ACCUMULATED_REWARDS_PER_UNIT = "accumulated_rewards_per_unit"
 
 const bytes TINY_POWER_THRESHOLD_KEY = "tiny_power_threshold"
 const bytes LAST_UPDATE_TIMESTAMP_KEY = "last_update_timestamp"
-const bytes ACCUMULATED_REWARDS_PER_UNIT = "accumulated_rewards_per_unit"
 const bytes TOTAL_STAKED_AMOUNT_KEY = "total_staked_amount"
 const bytes TOTAL_STAKER_COUNT_KEY = "total_staker_count"
 
@@ -220,6 +220,7 @@ func update_state(timestamp: int):
     if total_staked_amount:
         int time_delta = Global.LatestTimestamp - last_update_timestamp
 
+        # This would overflow if reward_rate_per_time > 18446744073 microunit.
         int reward_rate_per_unit_per_time = (reward_rate_per_time * RPU_SCALER) / total_staked_amount
         accumulated_rewards_per_unit = accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
 
@@ -244,7 +245,7 @@ func update_user_state(user_address: bytes[32]):
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
 
     rewards_per_unit_delta = accumulated_rewards_per_unit - user_state.accumulated_rewards_per_unit_at_last_update
-    rewards_delta = (user_state.staked_amount * rewards_per_unit_delta) / RPU_SCALER
+    rewards_delta = btoi(itob(user_state.staked_amount) b* itob(rewards_per_unit_delta)) / RPU_SCALER
 
     user_state.accumulated_rewards = user_state.accumulated_rewards + rewards_delta
     user_state.accumulated_rewards_per_unit_at_last_update = accumulated_rewards_per_unit
