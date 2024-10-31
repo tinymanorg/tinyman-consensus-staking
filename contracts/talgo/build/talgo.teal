@@ -15,7 +15,7 @@
 #define TALGO_TOTAL_SUPPLY 10_000_000_000_000_000
 
 // The rate of Algo/tAlgo is scaled by this value for integer storage and calculation
-#define RATE_SCALER 1_000_000
+#define RATE_SCALER 1_000_000_000_000
 
 // The Algorand protocol limit is 70M Algo per online account to remain eligible for proposer rewards.
 // We set 69M to allow space for rewards to accumulate.
@@ -267,37 +267,45 @@ __func__init:
     // tl:121: app_global_put("rate", 1 * RATE_SCALER)
     pushbytes "rate"
     pushint 1
-    pushint RATE_SCALER                                     // 1_000_000
+    pushint RATE_SCALER                                     // 1_000_000_000_000
     *
+    app_global_put
+    // tl:122: app_global_put("total_rewards", 0)
+    pushbytes "total_rewards"
+    pushint 0
+    app_global_put
+    // tl:123: app_global_put("protocol_talgo", 0)
+    pushbytes "protocol_talgo"
+    pushint 0
     app_global_put
     
     // Set the 5 accounts used for stake
     // The first is the application account
-    // tl:125: app_global_put("account_0", Global.CurrentApplicationAddress)
+    // tl:127: app_global_put("account_0", Global.CurrentApplicationAddress)
     pushbytes "account_0"
     global CurrentApplicationAddress
     app_global_put
     // create 4 auxiliary accounts
     // each account creation requires in 3 inner txns
-    // tl:128: app_global_put("account_1", create_auxiliary_account())
+    // tl:130: app_global_put("account_1", create_auxiliary_account())
     pushbytes "account_1"
     callsub __func__create_auxiliary_account
     app_global_put
-    // tl:129: app_global_put("account_2", create_auxiliary_account())
+    // tl:131: app_global_put("account_2", create_auxiliary_account())
     pushbytes "account_2"
     callsub __func__create_auxiliary_account
     app_global_put
-    // tl:130: app_global_put("account_3", create_auxiliary_account())
+    // tl:132: app_global_put("account_3", create_auxiliary_account())
     pushbytes "account_3"
     callsub __func__create_auxiliary_account
     app_global_put
-    // tl:131: app_global_put("account_4", create_auxiliary_account())
+    // tl:133: app_global_put("account_4", create_auxiliary_account())
     pushbytes "account_4"
     callsub __func__create_auxiliary_account
     app_global_put
     
-    // tl:133: log(ARC28Event("init(int,address,address,address,address,address)", itob(talgo_asset_id), app_global_get("account_0"), app_global_get("account_1"), app_global_get("account_2"), app_global_get("account_3"), app_global_get("account_4")))
-    pushbytes 0x4d714f4f                                    // SHA512_256("init(int,address,address,address,address,address)")[:4]
+    // tl:135: log(ARC28Event("init(uint64,address,address,address,address,address)", itob(talgo_asset_id), app_global_get("account_0"), app_global_get("account_1"), app_global_get("account_2"), app_global_get("account_3"), app_global_get("account_4")))
+    pushbytes 0xaf6e73ac                                    // SHA512_256("init(uint64,address,address,address,address,address)")[:4]
     load 2                                                  // talgo_asset_id
     itob
     pushbytes "account_0"
@@ -317,15 +325,15 @@ __func__init:
     concat
     concat
     log
-    // tl:134: return
+    // tl:136: return
     retsub
 
 
 // permission: anyone
-// tl:140: func mint(algo_amount: int):
+// tl:142: func mint(algo_amount: int):
 __func__mint:
     store 3                                                 // algo_amount [int]
-    // tl:141: assert(Gtxn[-1].Amount == algo_amount)
+    // tl:143: assert(Gtxn[-1].Amount == algo_amount)
     txn GroupIndex
     pushint 1
     -
@@ -333,7 +341,7 @@ __func__mint:
     load 3                                                  // algo_amount
     ==
     assert
-    // tl:142: assert(Gtxn[-1].Receiver == Global.CurrentApplicationAddress)
+    // tl:144: assert(Gtxn[-1].Receiver == Global.CurrentApplicationAddress)
     txn GroupIndex
     pushint 1
     -
@@ -345,7 +353,7 @@ __func__mint:
     // If the balance is too high minting is not available until the accounts are rebalanced with move_stake (or stake is reduced)
     // We can assume the balances of accounts 1-4 are kept below the max through the manual move_stake operations
     //  because they only gain algo through move_stake or rewards
-    // tl:147: assert(balance(app_global_get("account_0")) < MAX_ACCOUNT_BALANCE)
+    // tl:149: assert(balance(app_global_get("account_0")) < MAX_ACCOUNT_BALANCE)
     pushbytes "account_0"
     app_global_get
     balance
@@ -353,30 +361,30 @@ __func__mint:
     <
     assert
     // 1. Update state to account for rewards received since the last operation
-    // tl:149: update_rewards_and_rate(algo_amount)
+    // tl:151: update_rewards_and_rate(algo_amount)
     load 3                                                  // algo_amount
     callsub __func__update_rewards_and_rate
-    // tl:150: log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
-    pushbytes 0x6dc0b37a                                    // SHA512_256("rate_update(int)")[:4]
+    // tl:152: log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
+    pushbytes 0x7952d906                                    // SHA512_256("rate_update(uint64)")[:4]
     pushbytes "rate"
     app_global_get
     itob
     concat
     log
     // 2. Calculate the amount of tAlgo for the given Algo
-    // tl:152: int talgo_amount = calc_talgo(algo_amount) [slot 4]
+    // tl:154: int talgo_amount = calc_talgo(algo_amount) [slot 4]
     load 3                                                  // algo_amount
     callsub __func__calc_talgo
     store 4                                                 // talgo_amount
     // 3. Update the tracked tAlgo & Algo amounts
-    // tl:154: app_global_put("minted_talgo", app_global_get("minted_talgo") + talgo_amount)
+    // tl:156: app_global_put("minted_talgo", app_global_get("minted_talgo") + talgo_amount)
     pushbytes "minted_talgo"
     pushbytes "minted_talgo"
     app_global_get
     load 4                                                  // talgo_amount
     +
     app_global_put
-    // tl:155: app_global_put("algo_balance", app_global_get("algo_balance") + algo_amount)
+    // tl:157: app_global_put("algo_balance", app_global_get("algo_balance") + algo_amount)
     pushbytes "algo_balance"
     pushbytes "algo_balance"
     app_global_get
@@ -384,28 +392,30 @@ __func__mint:
     +
     app_global_put
     // 4. Transfer the tAlgo
-    // tl:157: transfer_talgo(Txn.Sender, talgo_amount)
+    // tl:159: transfer_talgo(Txn.Sender, talgo_amount)
     txn Sender
     load 4                                                  // talgo_amount
     callsub __func__transfer_talgo
-    // tl:158: log(ARC28Event("mint(address,int,int)", itob(algo_amount), itob(talgo_amount)))
-    pushbytes 0x7e98a758                                    // SHA512_256("mint(address,int,int)")[:4]
+    // tl:160: log(ARC28Event("mint(address,uint64,uint64)", Txn.Sender, itob(algo_amount), itob(talgo_amount)))
+    pushbytes 0x5bb7f4d6                                    // SHA512_256("mint(address,uint64,uint64)")[:4]
+    txn Sender
     load 3                                                  // algo_amount
     itob
     load 4                                                  // talgo_amount
     itob
     concat
     concat
+    concat
     log
-    // tl:159: return
+    // tl:161: return
     retsub
 
 
 // permission: anyone
-// tl:165: func burn(talgo_amount: int):
+// tl:167: func burn(talgo_amount: int):
 __func__burn:
     store 5                                                 // talgo_amount [int]
-    // tl:166: assert(Gtxn[-1].AssetAmount == talgo_amount)
+    // tl:168: assert(Gtxn[-1].AssetAmount == talgo_amount)
     txn GroupIndex
     pushint 1
     -
@@ -413,7 +423,7 @@ __func__burn:
     load 5                                                  // talgo_amount
     ==
     assert
-    // tl:167: assert(Gtxn[-1].AssetReceiver == Global.CurrentApplicationAddress)
+    // tl:169: assert(Gtxn[-1].AssetReceiver == Global.CurrentApplicationAddress)
     txn GroupIndex
     pushint 1
     -
@@ -421,7 +431,7 @@ __func__burn:
     global CurrentApplicationAddress
     ==
     assert
-    // tl:168: assert(Gtxn[-1].XferAsset == app_global_get("talgo_asset_id"))
+    // tl:170: assert(Gtxn[-1].XferAsset == app_global_get("talgo_asset_id"))
     txn GroupIndex
     pushint 1
     -
@@ -431,30 +441,30 @@ __func__burn:
     ==
     assert
     // 1. Update state to account for rewards received since the last operation
-    // tl:170: update_rewards_and_rate(0)
+    // tl:172: update_rewards_and_rate(0)
     pushint 0
     callsub __func__update_rewards_and_rate
-    // tl:171: log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
-    pushbytes 0x6dc0b37a                                    // SHA512_256("rate_update(int)")[:4]
+    // tl:173: log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
+    pushbytes 0x7952d906                                    // SHA512_256("rate_update(uint64)")[:4]
     pushbytes "rate"
     app_global_get
     itob
     concat
     log
     // 2. Calculate the amount of Algo for the given tAlgo
-    // tl:173: int algo_amount = calc_algo(talgo_amount) [slot 6]
+    // tl:175: int algo_amount = calc_algo(talgo_amount) [slot 6]
     load 5                                                  // talgo_amount
     callsub __func__calc_algo
     store 6                                                 // algo_amount
     // 3. Update the tracked tAlgo & Algo amounts
-    // tl:175: app_global_put("minted_talgo", app_global_get("minted_talgo") - talgo_amount)
+    // tl:177: app_global_put("minted_talgo", app_global_get("minted_talgo") - talgo_amount)
     pushbytes "minted_talgo"
     pushbytes "minted_talgo"
     app_global_get
     load 5                                                  // talgo_amount
     -
     app_global_put
-    // tl:176: app_global_put("algo_balance", app_global_get("algo_balance") - algo_amount)
+    // tl:178: app_global_put("algo_balance", app_global_get("algo_balance") - algo_amount)
     pushbytes "algo_balance"
     pushbytes "algo_balance"
     app_global_get
@@ -462,40 +472,42 @@ __func__burn:
     -
     app_global_put
     // 4. Transfer the Algo
-    // tl:178: transfer_algo(Txn.Sender, algo_amount)
+    // tl:180: transfer_algo(Txn.Sender, algo_amount)
     txn Sender
     load 6                                                  // algo_amount
     callsub __func__transfer_algo
-    // tl:179: log(ARC28Event("burn(address,int,int)", itob(talgo_amount), itob(algo_amount)))
-    pushbytes 0xbe975fb0                                    // SHA512_256("burn(address,int,int)")[:4]
+    // tl:181: log(ARC28Event("burn(address,uint64,uint64)", Txn.Sender, itob(talgo_amount), itob(algo_amount)))
+    pushbytes 0x29b5e3ea                                    // SHA512_256("burn(address,uint64,uint64)")[:4]
+    txn Sender
     load 5                                                  // talgo_amount
     itob
     load 6                                                  // algo_amount
     itob
     concat
     concat
+    concat
     log
-    // tl:180: return
+    // tl:182: return
     retsub
 
 
 // permission: anyone
-// tl:186: func claim_protocol_rewards():
+// tl:188: func claim_protocol_rewards():
 __func__claim_protocol_rewards:
-    // tl:187: transfer_talgo(UncheckedCast(app_global_get("fee_collector"), bytes[32]), app_global_get("protocol_talgo"))
+    // tl:189: transfer_talgo(UncheckedCast(app_global_get("fee_collector"), bytes[32]), app_global_get("protocol_talgo"))
     pushbytes "fee_collector"
     app_global_get
     pushbytes "protocol_talgo"
     app_global_get
     callsub __func__transfer_talgo
-    // tl:188: log(ARC28Event("claim_protocol_rewards(int)", itob(app_global_get("protocol_talgo"))))
-    pushbytes 0xf18ccb73                                    // SHA512_256("claim_protocol_rewards(int)")[:4]
+    // tl:190: log(ARC28Event("claim_protocol_rewards(uint64)", itob(app_global_get("protocol_talgo"))))
+    pushbytes 0x032cc210                                    // SHA512_256("claim_protocol_rewards(uint64)")[:4]
     pushbytes "protocol_talgo"
     app_global_get
     itob
     concat
     log
-    // tl:189: return
+    // tl:191: return
     retsub
 
 
@@ -504,173 +516,173 @@ __func__claim_protocol_rewards:
 // It may be useful to sync the state if no mint/burn has happened for some time.
 // It can also be useful for calling with Algod Simulate to retrieve the current rate without offline calculations.
 // permission: anyone
-// tl:199: func sync():
+// tl:201: func sync():
 __func__sync:
-    // tl:200: update_rewards_and_rate(0)
+    // tl:202: update_rewards_and_rate(0)
     pushint 0
     callsub __func__update_rewards_and_rate
-    // tl:201: log(ARC28Event("rate_update(int)", itob(app_global_get("rate"))))
-    pushbytes 0x6dc0b37a                                    // SHA512_256("rate_update(int)")[:4]
+    // tl:203: log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
+    pushbytes 0x7952d906                                    // SHA512_256("rate_update(uint64)")[:4]
     pushbytes "rate"
     app_global_get
     itob
     concat
     log
-    // tl:202: return
+    // tl:204: return
     retsub
 
 
 // permission: manager
-// tl:208: func set_manager(new_manager: bytes[32]):
+// tl:210: func set_manager(new_manager: bytes[32]):
 __func__set_manager:
     store 7                                                 // new_manager [bytes[32]]
-    // tl:209: assert(Txn.Sender == app_global_get("manager"))
+    // tl:211: assert(Txn.Sender == app_global_get("manager"))
     txn Sender
     pushbytes "manager"
     app_global_get
     ==
     assert
     
-    // tl:211: app_global_put("manager", new_manager)
+    // tl:213: app_global_put("manager", new_manager)
     pushbytes "manager"
     load 7                                                  // new_manager
     app_global_put
-    // tl:212: log(ARC28Event("set_manager(address)", new_manager))
+    // tl:214: log(ARC28Event("set_manager(address)", new_manager))
     pushbytes 0xba87e7f4                                    // SHA512_256("set_manager(address)")[:4]
     load 7                                                  // new_manager
     concat
     log
-    // tl:213: return
+    // tl:215: return
     retsub
 
 
 // This function sets the node manager for a specific account.
 // permission: manager
-// tl:220: func set_node_manager(node_index: int, new_node_manager: bytes[32]):
+// tl:222: func set_node_manager(node_index: int, new_node_manager: bytes[32]):
 __func__set_node_manager:
     store 8                                                 // new_node_manager [bytes[32]]
     store 9                                                 // node_index [int]
-    // tl:221: bytes[32] user_address = Txn.Sender [slot 10]
+    // tl:223: bytes[32] user_address = Txn.Sender [slot 10]
     txn Sender
     store 10                                                // user_address
-    // tl:222: assert(user_address == app_global_get("manager"))
+    // tl:224: assert(user_address == app_global_get("manager"))
     load 10                                                 // user_address
     pushbytes "manager"
     app_global_get
     ==
     assert
     
-    // tl:224: bytes key = concat("node_manager_", ascii_digit(node_index)) [slot 11]
+    // tl:226: bytes key = concat("node_manager_", ascii_digit(node_index)) [slot 11]
     pushbytes "node_manager_"
     load 9                                                  // node_index
     callsub __func__ascii_digit
     concat
     store 11                                                // key
-    // tl:225: app_global_put(key, new_node_manager)
+    // tl:227: app_global_put(key, new_node_manager)
     load 11                                                 // key
     load 8                                                  // new_node_manager
     app_global_put
-    // tl:226: log(ARC28Event("set_node_manager(int,address)", itob(node_index), new_node_manager))
-    pushbytes 0xdb2b95ae                                    // SHA512_256("set_node_manager(int,address)")[:4]
+    // tl:228: log(ARC28Event("set_node_manager(uint64,address)", itob(node_index), new_node_manager))
+    pushbytes 0xa3db1909                                    // SHA512_256("set_node_manager(uint64,address)")[:4]
     load 9                                                  // node_index
     itob
     load 8                                                  // new_node_manager
     concat
     concat
     log
-    // tl:227: return
+    // tl:229: return
     retsub
 
 
 // permission: manager
-// tl:233: func set_stake_manager(new_stake_manager: bytes[32]):
+// tl:235: func set_stake_manager(new_stake_manager: bytes[32]):
 __func__set_stake_manager:
     store 12                                                // new_stake_manager [bytes[32]]
-    // tl:234: bytes[32] user_address = Txn.Sender [slot 13]
+    // tl:236: bytes[32] user_address = Txn.Sender [slot 13]
     txn Sender
     store 13                                                // user_address
-    // tl:235: assert(user_address == app_global_get("manager"))
+    // tl:237: assert(user_address == app_global_get("manager"))
     load 13                                                 // user_address
     pushbytes "manager"
     app_global_get
     ==
     assert
     
-    // tl:237: app_global_put("stake_manager", new_stake_manager)
+    // tl:239: app_global_put("stake_manager", new_stake_manager)
     pushbytes "stake_manager"
     load 12                                                 // new_stake_manager
     app_global_put
-    // tl:238: log(ARC28Event("set_stake_manager(address)", new_stake_manager))
+    // tl:240: log(ARC28Event("set_stake_manager(address)", new_stake_manager))
     pushbytes 0x1682d945                                    // SHA512_256("set_stake_manager(address)")[:4]
     load 12                                                 // new_stake_manager
     concat
     log
-    // tl:239: return
+    // tl:241: return
     retsub
 
 
 // permission: manager
-// tl:245: func set_fee_collector(new_fee_collector: bytes[32]):
+// tl:247: func set_fee_collector(new_fee_collector: bytes[32]):
 __func__set_fee_collector:
     store 14                                                // new_fee_collector [bytes[32]]
-    // tl:246: bytes[32] user_address = Txn.Sender [slot 15]
+    // tl:248: bytes[32] user_address = Txn.Sender [slot 15]
     txn Sender
     store 15                                                // user_address
-    // tl:247: assert(user_address == app_global_get("manager"))
+    // tl:249: assert(user_address == app_global_get("manager"))
     load 15                                                 // user_address
     pushbytes "manager"
     app_global_get
     ==
     assert
     
-    // tl:249: app_global_put("fee_collector", new_fee_collector)
+    // tl:251: app_global_put("fee_collector", new_fee_collector)
     pushbytes "fee_collector"
     load 14                                                 // new_fee_collector
     app_global_put
-    // tl:250: log(ARC28Event("set_fee_collector(address)", new_fee_collector))
+    // tl:252: log(ARC28Event("set_fee_collector(address)", new_fee_collector))
     pushbytes 0x01251451                                    // SHA512_256("set_fee_collector(address)")[:4]
     load 14                                                 // new_fee_collector
     concat
     log
-    // tl:251: return
+    // tl:253: return
     retsub
 
 
 // permission: manager
-// tl:257: func set_protocol_fee(fee_amount: int):
+// tl:259: func set_protocol_fee(fee_amount: int):
 __func__set_protocol_fee:
     store 16                                                // fee_amount [int]
-    // tl:258: bytes[32] user_address = Txn.Sender [slot 17]
+    // tl:260: bytes[32] user_address = Txn.Sender [slot 17]
     txn Sender
     store 17                                                // user_address
-    // tl:259: assert(user_address == app_global_get("manager"))
+    // tl:261: assert(user_address == app_global_get("manager"))
     load 17                                                 // user_address
     pushbytes "manager"
     app_global_get
     ==
     assert
     
-    // tl:261: app_global_put("protocol_fee", fee_amount)
+    // tl:263: app_global_put("protocol_fee", fee_amount)
     pushbytes "protocol_fee"
     load 16                                                 // fee_amount
     app_global_put
-    // tl:262: log(ARC28Event("set_protocol_fee(int)", fee_amount))
-    pushbytes 0xc54a88b1                                    // SHA512_256("set_protocol_fee(int)")[:4]
+    // tl:264: log(ARC28Event("set_protocol_fee(uint64)", fee_amount))
+    pushbytes 0x6285c48b                                    // SHA512_256("set_protocol_fee(uint64)")[:4]
     load 16                                                 // fee_amount
     concat
     log
-    // tl:263: return
+    // tl:265: return
     retsub
 
 
 // permission: node_manager_{i}
-// tl:269: func change_online_status(node_index: int):
+// tl:271: func change_online_status(node_index: int):
 __func__change_online_status:
     store 18                                                // node_index [int]
-    // tl:270: bytes[32] user_address = Txn.Sender [slot 19]
+    // tl:272: bytes[32] user_address = Txn.Sender [slot 19]
     txn Sender
     store 19                                                // user_address
-    // tl:271: assert(user_address == app_global_get(concat("node_manager_", ascii_digit(node_index))))
+    // tl:273: assert(user_address == app_global_get(concat("node_manager_", ascii_digit(node_index))))
     load 19                                                 // user_address
     pushbytes "node_manager_"
     load 18                                                 // node_index
@@ -679,7 +691,7 @@ __func__change_online_status:
     app_global_get
     ==
     assert
-    // tl:272: bytes account_address = app_global_get(concat("account_", ascii_digit(node_index))) [slot 20]
+    // tl:274: bytes account_address = app_global_get(concat("account_", ascii_digit(node_index))) [slot 20]
     pushbytes "account_"
     load 18                                                 // node_index
     callsub __func__ascii_digit
@@ -692,7 +704,7 @@ __func__change_online_status:
     // Ensure that it is a Keyreg
     // Allow any keyreg fields
     // The point of this is to allow keyreg fields in future that we do not know about at compile time.
-    // tl:279: assert(Gtxn[+1].TypeEnum == Keyreg)
+    // tl:281: assert(Gtxn[+1].TypeEnum == Keyreg)
     txn GroupIndex
     pushint 1
     +
@@ -700,7 +712,7 @@ __func__change_online_status:
     pushint 2                                               // Keyreg
     ==
     assert
-    // tl:280: assert(Gtxn[+1].Sender == account_address)
+    // tl:282: assert(Gtxn[+1].Sender == account_address)
     txn GroupIndex
     pushint 1
     +
@@ -708,7 +720,7 @@ __func__change_online_status:
     load 20                                                 // account_address
     ==
     assert
-    // tl:281: assert(Gtxn[+1].RekeyTo == Global.CurrentApplicationAddress)
+    // tl:283: assert(Gtxn[+1].RekeyTo == Global.CurrentApplicationAddress)
     txn GroupIndex
     pushint 1
     +
@@ -718,7 +730,7 @@ __func__change_online_status:
     assert
     
     // If an increased fee is set in the keyreg txn, this exact fee must be paid to the same account in the txn prior to this.
-    // tl:284: if Gtxn[+1].Fee > 0:
+    // tl:286: if Gtxn[+1].Fee > 0:
     txn GroupIndex
     pushint 1
     +
@@ -727,7 +739,7 @@ __func__change_online_status:
     >
     bz l0_end
     // then:
-        // tl:285: assert(Gtxn[-1].Receiver == account_address)
+        // tl:287: assert(Gtxn[-1].Receiver == account_address)
         txn GroupIndex
         pushint 1
         -
@@ -735,7 +747,7 @@ __func__change_online_status:
         load 20                                             // account_address
         ==
         assert
-        // tl:286: assert(Gtxn[-1].Amount == Gtxn[+1].Fee)
+        // tl:288: assert(Gtxn[-1].Amount == Gtxn[+1].Fee)
         txn GroupIndex
         pushint 1
         -
@@ -747,81 +759,81 @@ __func__change_online_status:
         ==
         assert
     l0_end:
-    // tl:288: inner_txn:
+    // tl:290: inner_txn:
     itxn_begin
-        // tl:289: Sender: account_address
+        // tl:291: Sender: account_address
         load 20                                             // account_address
         itxn_field Sender
-        // tl:290: TypeEnum: Pay
+        // tl:292: TypeEnum: Pay
         pushint 1                                           // Pay
         itxn_field TypeEnum
-        // tl:291: RekeyTo: KEY_REG_LOGIC_SIG_ADDRESS
+        // tl:293: RekeyTo: KEY_REG_LOGIC_SIG_ADDRESS
         pushbytes KEY_REG_LOGIC_SIG_ADDRESS                 // "\xa6\xf3rQ\xa5\x8c\xa87\xbd\xa5\x17\xa9\xf7\x07\x0e\xe4\xb8\n8\x8f\xe4F\x14kk\xd4;;\xed]\\\xe5"
         itxn_field RekeyTo
-        // tl:292: Fee: 0
+        // tl:294: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
-    // tl:294: log(ARC28Event("change_online_status(int)", itob(node_index)))
-    pushbytes 0xb8707447                                    // SHA512_256("change_online_status(int)")[:4]
+    // tl:296: log(ARC28Event("change_online_status(uint64)", itob(node_index)))
+    pushbytes 0x82b6d6f6                                    // SHA512_256("change_online_status(uint64)")[:4]
     load 18                                                 // node_index
     itob
     concat
     log
-    // tl:295: return
+    // tl:297: return
     retsub
 
 
 // permission: stake_manager
-// tl:301: func move_stake(from_index: int, to_index: int, amount: int):
+// tl:303: func move_stake(from_index: int, to_index: int, amount: int):
 __func__move_stake:
     store 21                                                // amount [int]
     store 22                                                // to_index [int]
     store 23                                                // from_index [int]
-    // tl:302: bytes[32] user_address = Txn.Sender [slot 24]
+    // tl:304: bytes[32] user_address = Txn.Sender [slot 24]
     txn Sender
     store 24                                                // user_address
-    // tl:303: assert(user_address == app_global_get("stake_manager"))
+    // tl:305: assert(user_address == app_global_get("stake_manager"))
     load 24                                                 // user_address
     pushbytes "stake_manager"
     app_global_get
     ==
     assert
-    // tl:304: assert(to_index < 5)
+    // tl:306: assert(to_index < 5)
     load 22                                                 // to_index
     pushint 5
     <
     assert
-    // tl:305: inner_txn:
+    // tl:307: inner_txn:
     itxn_begin
-        // tl:306: TypeEnum: Pay
+        // tl:308: TypeEnum: Pay
         pushint 1                                           // Pay
         itxn_field TypeEnum
-        // tl:307: Sender: app_global_get(concat("account_", ascii_digit(from_index)))
+        // tl:309: Sender: app_global_get(concat("account_", ascii_digit(from_index)))
         pushbytes "account_"
         load 23                                             // from_index
         callsub __func__ascii_digit
         concat
         app_global_get
         itxn_field Sender
-        // tl:308: Receiver: app_global_get(concat("account_", ascii_digit(to_index)))
+        // tl:310: Receiver: app_global_get(concat("account_", ascii_digit(to_index)))
         pushbytes "account_"
         load 22                                             // to_index
         callsub __func__ascii_digit
         concat
         app_global_get
         itxn_field Receiver
-        // tl:309: Amount: amount
+        // tl:311: Amount: amount
         load 21                                             // amount
         itxn_field Amount
-        // tl:310: Fee: 0
+        // tl:312: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
-    // tl:312: log(ARC28Event("move_stake(int,int,int)", itob(from_index), itob(to_index), itob(amount)))
-    pushbytes 0x59c6440f                                    // SHA512_256("move_stake(int,int,int)")[:4]
+    // tl:314: log(ARC28Event("move_stake(uint64,uint64,uint64)", itob(from_index), itob(to_index), itob(amount)))
+    pushbytes 0xa9239572                                    // SHA512_256("move_stake(uint64,uint64,uint64)")[:4]
     load 23                                                 // from_index
     itob
     load 22                                                 // to_index
@@ -832,7 +844,7 @@ __func__move_stake:
     concat
     concat
     log
-    // tl:313: return
+    // tl:315: return
     retsub
 
 
@@ -841,10 +853,10 @@ __func__move_stake:
 // Using ascii in the global state key names is technically unnecessary but it looks nice and makes debugging easier.
 // It doesn't add significantly to the opcode cost as it is used sparingly.
 // NOTE: i MUST be < 10
-// tl:322: func ascii_digit(i: int) bytes:
+// tl:324: func ascii_digit(i: int) bytes:
 __func__ascii_digit:
     store 25                                                // i [int]
-    // tl:323: return extract(7, 1, itob(i + 48))
+    // tl:325: return extract(7, 1, itob(i + 48))
     load 25                                                 // i
     pushint 48
     +
@@ -853,118 +865,118 @@ __func__ascii_digit:
     retsub
 
 
-// tl:327: func update_rewards_and_rate(delta: int):
+// tl:329: func update_rewards_and_rate(delta: int):
 __func__update_rewards_and_rate:
     store 26                                                // delta [int]
+    // tl:330: int minted_talgo = app_global_get("minted_talgo") [slot 27]
+    pushbytes "minted_talgo"
+    app_global_get
+    store 27                                                // minted_talgo
+    // tl:331: if !minted_talgo:
+    load 27                                                 // minted_talgo
+    !
+    bz l1_end
+    // then:
+        // tl:332: return
+        retsub
+    l1_end:
     // delta is the additional balance transferred in this txn group that we want to ignore for now
     // we are only interested in calculating rewards/donations since the last txn
-    // tl:330: int algo_balance = full_balance() - delta [slot 27]
+    // tl:336: int algo_balance = full_balance() - delta [slot 28]
     callsub __func__full_balance
     load 26                                                 // delta
     -
-    store 27                                                // algo_balance
-    // tl:331: int new_rewards = algo_balance - app_global_get("algo_balance") [slot 28]
-    load 27                                                 // algo_balance
+    store 28                                                // algo_balance
+    // tl:337: int new_rewards = algo_balance - app_global_get("algo_balance") [slot 29]
+    load 28                                                 // algo_balance
     pushbytes "algo_balance"
     app_global_get
     -
-    store 28                                                // new_rewards
-    // tl:332: app_global_put("total_rewards", app_global_get("total_rewards") + new_rewards)
+    store 29                                                // new_rewards
+    // tl:338: app_global_put("total_rewards", app_global_get("total_rewards") + new_rewards)
     pushbytes "total_rewards"
     pushbytes "total_rewards"
     app_global_get
-    load 28                                                 // new_rewards
+    load 29                                                 // new_rewards
     +
     app_global_put
-    // tl:333: app_global_put("algo_balance", algo_balance)
+    // tl:339: app_global_put("algo_balance", algo_balance)
     pushbytes "algo_balance"
-    load 27                                                 // algo_balance
+    load 28                                                 // algo_balance
     app_global_put
     
     // Calculate the amount of Algo owed to the protocol according to "protocol_fee"
-    // tl:336: int protocol_rewards = (new_rewards * app_global_get("protocol_fee")) / 100 [slot 29]
-    load 28                                                 // new_rewards
+    // tl:342: int protocol_rewards = (new_rewards * app_global_get("protocol_fee")) / 100 [slot 30]
+    load 29                                                 // new_rewards
     pushbytes "protocol_fee"
     app_global_get
     *
     pushint 100
     /
-    store 29                                                // protocol_rewards
-    // Convert the protocol fee to talgo immediately as it will stay staked and earn rewards
-    // tl:338: int protocol_talgo = app_global_get("protocol_talgo") [slot 30]
-    pushbytes "protocol_talgo"
-    app_global_get
-    store 30                                                // protocol_talgo
-    // tl:339: int new_protocol_talgo = calc_talgo(protocol_rewards) [slot 31]
-    load 29                                                 // protocol_rewards
-    callsub __func__calc_talgo
-    store 31                                                // new_protocol_talgo
-    // tl:340: protocol_talgo = protocol_talgo + new_protocol_talgo
-    load 30                                                 // protocol_talgo
-    load 31                                                 // new_protocol_talgo
-    +
-    store 30                                                // protocol_talgo
-    // tl:341: app_global_put("protocol_talgo", protocol_talgo)
-    pushbytes "protocol_talgo"
-    load 30                                                 // protocol_talgo
+    store 30                                                // protocol_rewards
+    
+    // Update the rate to account for the new rewards
+    // The new protocol fee Algo must be subtracted as it is not part of the rewards to the tAlgo holders
+    // int rate = (algo_balance * RATE_SCALER) / minted_talgo
+    // use wide math otherwise any algo_balance over approx 18M would cause an overflow
+    // tl:348: int rate = btoi((itob(algo_balance - protocol_rewards) b* itob(RATE_SCALER)) b/ itob(minted_talgo)) [slot 31]
+    load 28                                                 // algo_balance
+    load 30                                                 // protocol_rewards
+    -
+    itob
+    pushint RATE_SCALER                                     // 1_000_000_000_000
+    itob
+    b*
+    load 27                                                 // minted_talgo
+    itob
+    b/
+    btoi
+    store 31                                                // rate
+    // tl:349: app_global_put("rate", rate)
+    pushbytes "rate"
+    load 31                                                 // rate
     app_global_put
     
-    // tl:343: int minted_talgo = app_global_get("minted_talgo") [slot 32]
-    pushbytes "minted_talgo"
+    // Now convert the protocol fee Algo to tAlgo (at the new rate) as it will stay staked and earn rewards
+    // tl:352: int protocol_talgo = app_global_get("protocol_talgo") [slot 32]
+    pushbytes "protocol_talgo"
     app_global_get
-    store 32                                                // minted_talgo
-    // tl:344: minted_talgo = minted_talgo + new_protocol_talgo
-    load 32                                                 // minted_talgo
-    load 31                                                 // new_protocol_talgo
+    store 32                                                // protocol_talgo
+    // tl:353: int new_protocol_talgo = calc_talgo(protocol_rewards) [slot 33]
+    load 30                                                 // protocol_rewards
+    callsub __func__calc_talgo
+    store 33                                                // new_protocol_talgo
+    // tl:354: protocol_talgo = protocol_talgo + new_protocol_talgo
+    load 32                                                 // protocol_talgo
+    load 33                                                 // new_protocol_talgo
     +
-    store 32                                                // minted_talgo
-    // tl:345: app_global_put("minted_talgo", minted_talgo)
-    pushbytes "minted_talgo"
-    load 32                                                 // minted_talgo
+    store 32                                                // protocol_talgo
+    // tl:355: app_global_put("protocol_talgo", protocol_talgo)
+    pushbytes "protocol_talgo"
+    load 32                                                 // protocol_talgo
     app_global_put
-    // tl:346: if minted_talgo:
-    load 32                                                 // minted_talgo
-    bz l1_else
-    // then:
-        // int rate = (algo_balance * RATE_SCALER) / minted_talgo
-        // use wide math otherwise any algo_balance over approx 18M would cause an overflow
-        // tl:349: int rate = btoi((itob(algo_balance) b* itob(RATE_SCALER)) b/ itob(minted_talgo)) [slot 33]
-        load 27                                             // algo_balance
-        itob
-        pushint RATE_SCALER                                 // 1_000_000
-        itob
-        b*
-        load 32                                             // minted_talgo
-        itob
-        b/
-        btoi
-        store 33                                            // rate
-        // tl:350: app_global_put("rate", rate)
-        pushbytes "rate"
-        load 33                                             // rate
-        app_global_put
-        b l1_end
-    l1_else:
-    // tl:351: else:
-        // tl:352: app_global_put("rate", 1 * RATE_SCALER)
-        pushbytes "rate"
-        pushint 1
-        pushint RATE_SCALER                                 // 1_000_000
-        *
-        app_global_put
-    l1_end:
-    // tl:354: return
+    
+    // tl:357: minted_talgo = minted_talgo + new_protocol_talgo
+    load 27                                                 // minted_talgo
+    load 33                                                 // new_protocol_talgo
+    +
+    store 27                                                // minted_talgo
+    // tl:358: app_global_put("minted_talgo", minted_talgo)
+    pushbytes "minted_talgo"
+    load 27                                                 // minted_talgo
+    app_global_put
+    // tl:359: return
     retsub
 
 
-// tl:358: func calc_talgo(algo_amount: int) int:
+// tl:363: func calc_talgo(algo_amount: int) int:
 __func__calc_talgo:
     store 34                                                // algo_amount [int]
     // int talgo_amount = (algo_amount * RATE_SCALER) / app_global_get("rate")
-    // tl:360: int talgo_amount = btoi((itob(algo_amount) b* itob(RATE_SCALER)) b/ itob(app_global_get("rate"))) [slot 35]
+    // tl:365: int talgo_amount = btoi((itob(algo_amount) b* itob(RATE_SCALER)) b/ itob(app_global_get("rate"))) [slot 35]
     load 34                                                 // algo_amount
     itob
-    pushint RATE_SCALER                                     // 1_000_000
+    pushint RATE_SCALER                                     // 1_000_000_000_000
     itob
     b*
     pushbytes "rate"
@@ -973,60 +985,60 @@ __func__calc_talgo:
     b/
     btoi
     store 35                                                // talgo_amount
-    // tl:361: return talgo_amount
+    // tl:366: return talgo_amount
     load 35                                                 // talgo_amount
     retsub
 
 
-// tl:365: func calc_algo(talgo_amount: int) int:
+// tl:370: func calc_algo(talgo_amount: int) int:
 __func__calc_algo:
     store 36                                                // talgo_amount [int]
     // int algo_amount = (talgo_amount * app_global_get("rate")) / RATE_SCALER
-    // tl:367: int algo_amount = btoi((itob(talgo_amount) b* itob(app_global_get("rate"))) b/ itob(RATE_SCALER)) [slot 37]
+    // tl:372: int algo_amount = btoi((itob(talgo_amount) b* itob(app_global_get("rate"))) b/ itob(RATE_SCALER)) [slot 37]
     load 36                                                 // talgo_amount
     itob
     pushbytes "rate"
     app_global_get
     itob
     b*
-    pushint RATE_SCALER                                     // 1_000_000
+    pushint RATE_SCALER                                     // 1_000_000_000_000
     itob
     b/
     btoi
     store 37                                                // algo_amount
-    // tl:368: return algo_amount
+    // tl:373: return algo_amount
     load 37                                                 // algo_amount
     retsub
 
 
-// tl:372: func create_auxiliary_account() bytes[32]:
+// tl:377: func create_auxiliary_account() bytes[32]:
 __func__create_auxiliary_account:
     // 1. create application with program that rekeys its account to current app and deletes itself
-    // tl:374: inner_txn:
+    // tl:379: inner_txn:
     itxn_begin
-        // tl:375: TypeEnum: Appl
+        // tl:380: TypeEnum: Appl
         pushint 6                                           // Appl
         itxn_field TypeEnum
-        // tl:376: OnCompletion: DeleteApplication
+        // tl:381: OnCompletion: DeleteApplication
         pushint 5                                           // DeleteApplication
         itxn_field OnCompletion
-        // tl:377: ApprovalProgram: AUX_PROGRAM
+        // tl:382: ApprovalProgram: AUX_PROGRAM
         pushbytes AUX_PROGRAM                               // "\n1\x18\x81\x00\x12D\xb1\x81\x01\xb2\x101\x00\xb2\x071\x00\xb2 \x81\x00\xb2\x01\xb3\x81\x01C"
         itxn_field ApprovalProgram
-        // tl:378: ClearStateProgram: "\x0A\x81\x01"
+        // tl:383: ClearStateProgram: "\x0A\x81\x01"
         pushbytes "\x0A\x81\x01"
         itxn_field ClearStateProgram
-        // tl:379: Fee: 0
+        // tl:384: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
-    // tl:381: int app_id = Itxn.CreatedApplicationID [slot 38]
+    // tl:386: int app_id = Itxn.CreatedApplicationID [slot 38]
     itxn CreatedApplicationID
     store 38                                                // app_id
     
     // 2. determine app address from the app id
-    // tl:384: bytes[32] address = UncheckedCast(sha512_256(concat("appID", itob(app_id))), bytes[32]) [slot 39]
+    // tl:389: bytes[32] address = UncheckedCast(sha512_256(concat("appID", itob(app_id))), bytes[32]) [slot 39]
     pushbytes "appID"
     load 38                                                 // app_id
     itob
@@ -1035,112 +1047,94 @@ __func__create_auxiliary_account:
     store 39                                                // address
     
     // 3. fund account with mbr algo
-    // tl:387: inner_txn:
+    // tl:392: inner_txn:
     itxn_begin
-        // tl:388: TypeEnum: Pay
+        // tl:393: TypeEnum: Pay
         pushint 1                                           // Pay
         itxn_field TypeEnum
-        // tl:389: Receiver: address
+        // tl:394: Receiver: address
         load 39                                             // address
         itxn_field Receiver
-        // tl:390: Amount: 100_000
+        // tl:395: Amount: 100_000
         pushint 100000
         itxn_field Amount
-        // tl:391: Fee: 0
+        // tl:396: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
-    // tl:393: return address
+    // tl:398: return address
     load 39                                                 // address
     retsub
 
 // Any public method that uses this function must have account references to accounts 1-4.
 // 4 additional accounts were chosen so only a single app call would be required for mint/burn.
-// tl:398: func full_balance() int:
+// tl:403: func full_balance() int:
 __func__full_balance:
-    // tl:399: int algo = 0 [slot 40]
+    // tl:404: int algo = 0 [slot 40]
     pushint 0
     store 40                                                // algo
-    // tl:400: algo = algo + balance(app_global_get("account_0"))
+    // tl:405: algo = algo + balance(app_global_get("account_0"))
     load 40                                                 // algo
     pushbytes "account_0"
     app_global_get
     balance
     +
     store 40                                                // algo
-    // tl:401: algo = algo + balance(app_global_get("account_1"))
+    // tl:406: algo = algo + balance(app_global_get("account_1"))
     load 40                                                 // algo
     pushbytes "account_1"
     app_global_get
     balance
     +
     store 40                                                // algo
-    // tl:402: algo = algo + balance(app_global_get("account_2"))
+    // tl:407: algo = algo + balance(app_global_get("account_2"))
     load 40                                                 // algo
     pushbytes "account_2"
     app_global_get
     balance
     +
     store 40                                                // algo
-    // tl:403: algo = algo + balance(app_global_get("account_3"))
+    // tl:408: algo = algo + balance(app_global_get("account_3"))
     load 40                                                 // algo
     pushbytes "account_3"
     app_global_get
     balance
     +
     store 40                                                // algo
-    // tl:404: algo = algo + balance(app_global_get("account_4"))
+    // tl:409: algo = algo + balance(app_global_get("account_4"))
     load 40                                                 // algo
     pushbytes "account_4"
     app_global_get
     balance
     +
     store 40                                                // algo
-    // tl:405: algo = algo - app_global_get("initial_balance")
+    // tl:410: algo = algo - app_global_get("initial_balance")
     load 40                                                 // algo
     pushbytes "initial_balance"
     app_global_get
     -
     store 40                                                // algo
-    // tl:406: return algo
+    // tl:411: return algo
     load 40                                                 // algo
     retsub
 
 
-// tl:410: func find_account_with_highest_balance() int:
+// tl:415: func find_account_with_highest_balance() int:
 __func__find_account_with_highest_balance:
-    // tl:411: int b = balance(app_global_get("account_0")) [slot 41]
+    // tl:416: int b = balance(app_global_get("account_0")) [slot 41]
     pushbytes "account_0"
     app_global_get
     balance
     store 41                                                // b
-    // tl:412: int max = b [slot 42]
+    // tl:417: int max = b [slot 42]
     load 41                                                 // b
     store 42                                                // max
-    // tl:413: int account_index = 0 [slot 43]
+    // tl:418: int account_index = 0 [slot 43]
     pushint 0
     store 43                                                // account_index
-    // tl:414: b = balance(app_global_get("account_1"))
+    // tl:419: b = balance(app_global_get("account_1"))
     pushbytes "account_1"
-    app_global_get
-    balance
-    store 41                                                // b
-    // tl:415: if b > max:
-    load 41                                                 // b
-    load 42                                                 // max
-    >
-    bz l2_end
-    // then:
-        // tl:416: account_index = 1
-        pushint 1
-        store 43                                            // account_index
-        // tl:417: max = b
-        load 41                                             // b
-        store 42                                            // max
-    l2_end:
-    // tl:419: b = balance(app_global_get("account_2"))
-    pushbytes "account_2"
     app_global_get
     balance
     store 41                                                // b
@@ -1148,17 +1142,17 @@ __func__find_account_with_highest_balance:
     load 41                                                 // b
     load 42                                                 // max
     >
-    bz l3_end
+    bz l2_end
     // then:
-        // tl:421: account_index = 2
-        pushint 2
+        // tl:421: account_index = 1
+        pushint 1
         store 43                                            // account_index
         // tl:422: max = b
         load 41                                             // b
         store 42                                            // max
-    l3_end:
-    // tl:424: b = balance(app_global_get("account_3"))
-    pushbytes "account_3"
+    l2_end:
+    // tl:424: b = balance(app_global_get("account_2"))
+    pushbytes "account_2"
     app_global_get
     balance
     store 41                                                // b
@@ -1166,17 +1160,17 @@ __func__find_account_with_highest_balance:
     load 41                                                 // b
     load 42                                                 // max
     >
-    bz l4_end
+    bz l3_end
     // then:
-        // tl:426: account_index = 3
-        pushint 3
+        // tl:426: account_index = 2
+        pushint 2
         store 43                                            // account_index
         // tl:427: max = b
         load 41                                             // b
         store 42                                            // max
-    l4_end:
-    // tl:429: b = balance(app_global_get("account_4"))
-    pushbytes "account_4"
+    l3_end:
+    // tl:429: b = balance(app_global_get("account_3"))
+    pushbytes "account_3"
     app_global_get
     balance
     store 41                                                // b
@@ -1184,80 +1178,98 @@ __func__find_account_with_highest_balance:
     load 41                                                 // b
     load 42                                                 // max
     >
-    bz l5_end
+    bz l4_end
     // then:
-        // tl:431: account_index = 4
-        pushint 4
+        // tl:431: account_index = 3
+        pushint 3
         store 43                                            // account_index
         // tl:432: max = b
         load 41                                             // b
         store 42                                            // max
+    l4_end:
+    // tl:434: b = balance(app_global_get("account_4"))
+    pushbytes "account_4"
+    app_global_get
+    balance
+    store 41                                                // b
+    // tl:435: if b > max:
+    load 41                                                 // b
+    load 42                                                 // max
+    >
+    bz l5_end
+    // then:
+        // tl:436: account_index = 4
+        pushint 4
+        store 43                                            // account_index
+        // tl:437: max = b
+        load 41                                             // b
+        store 42                                            // max
     l5_end:
-    // tl:434: return account_index
+    // tl:439: return account_index
     load 43                                                 // account_index
     retsub
 
 
-// tl:438: func transfer_talgo(receiver: bytes[32], amount: int):
+// tl:443: func transfer_talgo(receiver: bytes[32], amount: int):
 __func__transfer_talgo:
     store 44                                                // amount [int]
     store 45                                                // receiver [bytes[32]]
     // Sender is always the Application Account
-    // tl:440: inner_txn:
+    // tl:445: inner_txn:
     itxn_begin
-        // tl:441: TypeEnum: Axfer
+        // tl:446: TypeEnum: Axfer
         pushint 4                                           // Axfer
         itxn_field TypeEnum
-        // tl:442: AssetReceiver: receiver
+        // tl:447: AssetReceiver: receiver
         load 45                                             // receiver
         itxn_field AssetReceiver
-        // tl:443: AssetAmount: amount
+        // tl:448: AssetAmount: amount
         load 44                                             // amount
         itxn_field AssetAmount
-        // tl:444: XferAsset: app_global_get("talgo_asset_id")
+        // tl:449: XferAsset: app_global_get("talgo_asset_id")
         pushbytes "talgo_asset_id"
         app_global_get
         itxn_field XferAsset
-        // tl:445: Fee: 0
+        // tl:450: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
-    // tl:447: return
+    // tl:452: return
     retsub
 
 
-// tl:451: func transfer_algo(receiver: bytes[32], amount: int):
+// tl:456: func transfer_algo(receiver: bytes[32], amount: int):
 __func__transfer_algo:
     store 46                                                // amount [int]
     store 47                                                // receiver [bytes[32]]
     // Send from the account with the highest balance
-    // tl:453: int from_index = find_account_with_highest_balance() [slot 48]
+    // tl:458: int from_index = find_account_with_highest_balance() [slot 48]
     callsub __func__find_account_with_highest_balance
     store 48                                                // from_index
-    // tl:454: inner_txn:
+    // tl:459: inner_txn:
     itxn_begin
-        // tl:455: TypeEnum: Pay
+        // tl:460: TypeEnum: Pay
         pushint 1                                           // Pay
         itxn_field TypeEnum
-        // tl:456: Sender: app_global_get(concat("account_", ascii_digit(from_index)))
+        // tl:461: Sender: app_global_get(concat("account_", ascii_digit(from_index)))
         pushbytes "account_"
         load 48                                             // from_index
         callsub __func__ascii_digit
         concat
         app_global_get
         itxn_field Sender
-        // tl:457: Receiver: receiver
+        // tl:462: Receiver: receiver
         load 47                                             // receiver
         itxn_field Receiver
-        // tl:458: Amount: amount
+        // tl:463: Amount: amount
         load 46                                             // amount
         itxn_field Amount
-        // tl:459: Fee: 0
+        // tl:464: Fee: 0
         pushint 0
         itxn_field Fee
     itxn_submit
     // end inner_txn
-    // tl:461: return
+    // tl:466: return
     retsub
 
