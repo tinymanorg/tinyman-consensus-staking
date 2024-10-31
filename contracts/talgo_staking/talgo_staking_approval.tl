@@ -245,7 +245,7 @@ func update_user_state(user_address: bytes[32]):
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
 
     rewards_per_unit_delta = accumulated_rewards_per_unit - user_state.accumulated_rewards_per_unit_at_last_update
-    rewards_delta = btoi(itob(user_state.staked_amount) b* itob(rewards_per_unit_delta)) / RPU_SCALER
+    rewards_delta = btoi((itob(user_state.staked_amount) b* itob(rewards_per_unit_delta)) b/ itob(RPU_SCALER))
 
     user_state.accumulated_rewards = user_state.accumulated_rewards + rewards_delta
     user_state.accumulated_rewards_per_unit_at_last_update = accumulated_rewards_per_unit

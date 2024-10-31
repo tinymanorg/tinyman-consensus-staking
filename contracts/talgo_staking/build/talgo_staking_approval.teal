@@ -600,15 +600,16 @@ __func__update_user_state:
     load 31; pushint 8; pushint 8; box_extract; btoi// user_state.accumulated_rewards_per_unit_at_last_update
     -
     store 29                                                // rewards_per_unit_delta
-    // tl:248: rewards_delta = btoi(itob(user_state.staked_amount) b* itob(rewards_per_unit_delta)) / RPU_SCALER
+    // tl:248: rewards_delta = btoi((itob(user_state.staked_amount) b* itob(rewards_per_unit_delta)) b/ itob(RPU_SCALER))
     load 31; pushint 0; pushint 8; box_extract; btoi// user_state.staked_amount
     itob
     load 29                                                 // rewards_per_unit_delta
     itob
     b*
-    btoi
     pushint RPU_SCALER                                      // 1000000000
-    /
+    itob
+    b/
+    btoi
     store 30                                                // rewards_delta
     
     // tl:250: user_state.accumulated_rewards = user_state.accumulated_rewards + rewards_delta
