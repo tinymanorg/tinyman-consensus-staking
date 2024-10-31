@@ -184,9 +184,6 @@ func apply_rate_change():
         app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
         app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
 
-        # TODO: This might not be needed. Discuss.
-        update_state(Global.LatestTimestamp)
-
         reward_rate_per_time = 0
         log(ARC28Event("apply_rate_change(uint64)", itob(reward_rate_per_time)))
     end
