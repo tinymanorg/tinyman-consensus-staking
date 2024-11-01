@@ -55,11 +55,6 @@ def get_accumulated_rewards(user_state, global_state: TAlgoStakingAppGlobalState
     
     assert(user_state.timestamp <= current_timestamp)
 
-    """
-    rewards_per_unit_delta = accumulated_rewards_per_unit - user_state.accumulated_rewards_per_unit_at_last_update
-    rewards_delta = btoi((itob(user_state.staked_amount) b* itob(rewards_per_unit_delta)) b/ itob(RPU_SCALER))
-    """
-
     rewards_per_unit_delta = global_state.get_accumulated_rewards_per_unit(current_timestamp) - user_state.accumulated_rewards_per_unit_at_last_update
     rewards_delta = (user_state.staked_amount * rewards_per_unit_delta) // 1_000_000_000
 
