@@ -39,6 +39,7 @@ router:
     create_application
     update_application
     init
+    set_manager
     set_tiny_power_threshold
     set_reward_rate
     apply_rate_change
@@ -104,6 +105,17 @@ func init():
     app_global_put(STALGO_ASSET_ID_KEY, Itxn.CreatedAssetID)
 
     log(ARC28Event("init(uint64)", itob(app_global_get(STALGO_ASSET_ID_KEY))))
+    return
+end
+
+
+@public()
+func set_manager(new_manager: bytes[32]):
+    bytes[32] user_address = Txn.Sender
+    assert(user_address == app_global_get(MANAGER_KEY))
+
+    app_global_put(MANAGER_KEY, new_manager)
+    log(ARC28Event("set_manager(address)", new_manager))
     return
 end
 
