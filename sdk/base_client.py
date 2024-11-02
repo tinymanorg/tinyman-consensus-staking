@@ -7,6 +7,7 @@ from algosdk.encoding import decode_address, encode_address
 from algosdk.logic import get_application_address
 from algosdk.account import generate_account
 
+from sdk.struct import get_struct, get_box_costs
 
 class BaseClient():
     def __init__(self, algod, app_id, user_address, user_sk) -> None:
@@ -84,7 +85,7 @@ class BaseClient():
         struct_class = get_struct(struct_name)
         struct = struct_class(box_value)
         return struct
-    
+
     def box_exists(self, box_name, app_id=None):
         app_id = app_id or self.app_id
         try:

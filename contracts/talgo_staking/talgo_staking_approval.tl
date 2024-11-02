@@ -1,12 +1,5 @@
-#pragma version 9
+#pragma version 10
 
-# Name: <index>
-# Size: 24 bytes
-struct RewardPeriod:
-    total_reward_amount: int
-    start_timestamp: int
-    end_timestamp: int
-end
 
 # Name: <user_address>
 struct UserState:
@@ -16,19 +9,22 @@ struct UserState:
     timestamp: int
 end
 
+
 # Global State
 
 const bytes VAULT_APP_ID_KEY = "vault_app_id"
 const bytes TINY_ASSET_ID_KEY = "tiny_asset_id"
 const bytes TALGO_ASSET_ID_KEY = "talgo_asset_id"
 const bytes STALGO_ASSET_ID_KEY = "stalgo_asset_id"
-const bytes PERIOD_COUNT_KEY = "period_count"
-const bytes CURRENT_PERIOD_INDEX_KEY = "current_period_index"
+
+const int MAX_RATE_INCREMENT_PERCENTAGE = 10
+const bytes LAST_REWARD_RATE_PER_TIME_KEY = "last_reward_rate_per_time"
+const bytes CURRENT_REWARD_RATE_PER_TIME_KEY = "current_reward_rate_per_time"
+const bytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY = "current_reward_rate_per_time_end_timestamp"
+const bytes ACCUMULATED_REWARDS_PER_UNIT = "accumulated_rewards_per_unit"
 
 const bytes TINY_POWER_THRESHOLD_KEY = "tiny_power_threshold"
 const bytes LAST_UPDATE_TIMESTAMP_KEY = "last_update_timestamp"
-const bytes ACCUMULATED_REWARDS_PER_UNIT = "accumulated_rewards_per_unit"
-const bytes CURRENT_REWARD_RATE_PER_TIME_KEY = "current_reward_rate_per_time"
 const bytes TOTAL_STAKED_AMOUNT_KEY = "total_staked_amount"
 const bytes TOTAL_STAKER_COUNT_KEY = "total_staker_count"
 
@@ -41,10 +37,12 @@ const int ALGO_TOTAL_SUPPLY = 10000000000000000
 
 router:
     create_application
-    init
     update_application
-    create_reward_period
+    init
+    set_manager
     set_tiny_power_threshold
+    set_reward_rate
+    apply_rate_change
     update_state
     increase_stake
     decrease_stake
@@ -61,6 +59,7 @@ func update_application():
 end
 
 
+# Permission: anyone
 @public(OnCompletion=CreateApplication)
 func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: int, manager_address: bytes[32]):
     app_global_put(TALGO_ASSET_ID_KEY, talgo_asset_id)
@@ -69,12 +68,17 @@ func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: i
     app_global_put(MANAGER_KEY, manager_address)
     app_global_put(TINY_POWER_THRESHOLD_KEY, 1000)
 
+    app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+    app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
+    app_global_put(LAST_REWARD_RATE_PER_TIME_KEY, 0)
+
     # create_application(talgo_asset_id, tiny_asset_id, manager_address, stalgo_asset_id)
     log(ARC28Event("create_application(uint64,uint64,uint64,address)", itob(talgo_asset_id), itob(tiny_asset_id), itob(vault_app_id), manager_address))
     return
 end
 
 
+# Permission: manager
 @public()
 func init():
     assert(Txn.Sender == app_global_get(MANAGER_KEY))
@@ -100,35 +104,23 @@ func init():
 
     app_global_put(STALGO_ASSET_ID_KEY, Itxn.CreatedAssetID)
 
-    log(ARC28Event("init(uint64)", itob(app_global_get("STALGO_ASSET_ID_KEY"))))
+    log(ARC28Event("init(uint64)", itob(app_global_get(STALGO_ASSET_ID_KEY))))
     return
 end
 
 
 @public()
-func create_reward_period(total_reward_amount: int, start_timestamp: int, end_timestamp: int):
-    assert(Txn.Sender == app_global_get(MANAGER_KEY))
+func set_manager(new_manager: bytes[32]):
+    bytes[32] user_address = Txn.Sender
+    assert(user_address == app_global_get(MANAGER_KEY))
 
-    assert(total_reward_amount)
-    assert(start_timestamp >= Global.LatestTimestamp)
-    assert(end_timestamp > start_timestamp)
-
-    int period_count = app_global_get(PERIOD_COUNT_KEY)
-
-    box<RewardPeriod> reward_period = CreateBox(itob(period_count))
-    reward_period.total_reward_amount = total_reward_amount
-    reward_period.start_timestamp = start_timestamp
-    reward_period.end_timestamp = end_timestamp
-
-    period_count = period_count + 1
-    app_global_put(PERIOD_COUNT_KEY, period_count)
-
-    log(ARC28Event("reward_period(uint64,uint64,uint64)", itob(total_reward_amount), itob(start_timestamp), itob(end_timestamp)))
-    log(ARC28Event("create_reward_period(uint64)", itob(period_count)))
+    app_global_put(MANAGER_KEY, new_manager)
+    log(ARC28Event("set_manager(address)", new_manager))
     return
 end
 
 
+# Permission: manager
 @public()
 func set_tiny_power_threshold(threshold: int):
     assert(Txn.Sender == app_global_get(MANAGER_KEY))
@@ -140,36 +132,104 @@ func set_tiny_power_threshold(threshold: int):
 end
 
 
+# Permission: manager
 @public()
-func update_state(period_index: int):
-    int current_period_index = app_global_get(CURRENT_PERIOD_INDEX_KEY)
-    box<RewardPeriod> current_reward_period = OpenBox(itob(current_period_index))
+func set_reward_rate(total_reward_amount: int, end_timestamp: int):
+    assert(Txn.Sender == app_global_get(MANAGER_KEY))
 
-    if current_period_index != period_index:
-        assert(current_reward_period.end_timestamp <= Global.LatestTimestamp)
+    assert(total_reward_amount)
+    assert(end_timestamp > Global.LatestTimestamp)
 
-        box<RewardPeriod> new_reward_period = OpenBox(itob(period_index))
-        assert(new_reward_period.start_timestamp <= Global.LatestTimestamp)
-        assert(new_reward_period.end_timestamp > Global.LatestTimestamp)
+    # Wrap up, accumulate for the last rate.
+    update_state(Global.LatestTimestamp)
 
-        app_global_put(CURRENT_PERIOD_INDEX_KEY, period_index)
-        current_reward_period = new_reward_period
+    int duration = end_timestamp - Global.LatestTimestamp
+    int reward_rate_per_time = total_reward_amount / duration
 
-        int duration = current_reward_period.end_timestamp - current_reward_period.start_timestamp
-        int reward_rate_per_time = current_reward_period.total_reward_amount / duration
-        app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
+    int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY)
+    int last_current_reward_rate_per_time = app_global_get(LAST_REWARD_RATE_PER_TIME_KEY)
+    int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
+
+    int max_rate_per_time
+    if last_current_reward_rate_per_time < current_reward_rate_per_time:
+        max_rate_per_time = current_reward_rate_per_time
     else:
-        assert(current_reward_period.end_timestamp >= Global.LatestTimestamp)
+        max_rate_per_time = last_current_reward_rate_per_time
+    end
+    max_rate_per_time = max_rate_per_time + ((max_rate_per_time * MAX_RATE_INCREMENT_PERCENTAGE) / 100)
+
+    # Check is disabled for initialization.
+    if max_rate_per_time:
+        assert(reward_rate_per_time < max_rate_per_time)
     end
 
-    int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY)
+    app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
+    app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, end_timestamp)
+
+    log(ARC28Event("set_reward_rate(uint64,uint64,uint64,uint64)", itob(total_reward_amount), itob(Global.LatestTimestamp), itob(end_timestamp), itob(reward_rate_per_time)))
+    return
+end
+
+
+# Description: If current rate expiration is reached, set it to 0.
+# Permission: anyone.
+@public()
+func apply_rate_change():
+    int reward_rate_per_time
+
     int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
+    int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY)
+
+    int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY)
+
+    if Global.LatestTimestamp <= current_reward_rate_per_time_end_timestamp:
+        # Do nothing. CURRENT_REWARD_RATE_PER_TIME is valid.
+        reward_rate_per_time = current_reward_rate_per_time
+
+    else:
+        update_state(current_reward_rate_per_time_end_timestamp)
+
+        # Save the CURRENT_REWARD_RATE_PER_TIME for increment check in `set_reward_rate`.
+        app_global_put(LAST_REWARD_RATE_PER_TIME_KEY, current_reward_rate_per_time)
+
+        # Update the CURRENT_REWARD_RATE_PER_TIME to 0.
+        app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
+        app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+
+        reward_rate_per_time = 0
+        log(ARC28Event("apply_rate_change(uint64)", itob(reward_rate_per_time)))
+    end
+
+    return
+end
+
+
+# Validate and get CURRENT_REWARD_RATE_PER_TIME value.
+func get_reward_rate_per_time() int:
+    int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
+    int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY)
+
+    # Ensure CURRENT_REWARD_RATE_PER_TIME is disabled or still valid.
+    assert(Global.LatestTimestamp <= current_reward_rate_per_time_end_timestamp)
+
+    return current_reward_rate_per_time
+end
+
+
+# Description: Accumulate rewards. Fails if there is a pending rate change.
+# Permission: anyone.
+@public()
+func update_state(timestamp: int):
+    int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY)
     int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
+
+    int reward_rate_per_time = get_reward_rate_per_time()
 
     if total_staked_amount:
         int time_delta = Global.LatestTimestamp - last_update_timestamp
 
+        # This would overflow if reward_rate_per_time > 18446744073 microunit.
         int reward_rate_per_unit_per_time = (reward_rate_per_time * RPU_SCALER) / total_staked_amount
         accumulated_rewards_per_unit = accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
 
@@ -177,12 +237,12 @@ func update_state(period_index: int):
         app_global_put(ACCUMULATED_REWARDS_PER_UNIT, accumulated_rewards_per_unit)
     end
 
-    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(last_update_timestamp), itob(current_reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
-    log(ARC28Event("update_state(uint64)", itob(period_index)))
+    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(last_update_timestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
     return
 end
 
 
+# Description: Accumulate user rewards. Should be called after `update_state`.
 func update_user_state(user_address: bytes[32]):
     int rewards_per_unit_delta
     int rewards_delta
@@ -190,12 +250,11 @@ func update_user_state(user_address: bytes[32]):
     box<UserState> user_state = OpenBox(user_address)
 
     int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY)
-    int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
     int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
 
     rewards_per_unit_delta = accumulated_rewards_per_unit - user_state.accumulated_rewards_per_unit_at_last_update
-    rewards_delta = (user_state.staked_amount * rewards_per_unit_delta) / RPU_SCALER
+    rewards_delta = btoi((itob(user_state.staked_amount) b* itob(rewards_per_unit_delta)) b/ itob(RPU_SCALER))
 
     user_state.accumulated_rewards = user_state.accumulated_rewards + rewards_delta
     user_state.accumulated_rewards_per_unit_at_last_update = accumulated_rewards_per_unit
@@ -209,6 +268,7 @@ func update_user_state(user_address: bytes[32]):
 end
 
 
+# Permission: user
 @public()
 func increase_stake(amount: int):
     int total_staker_count
@@ -216,13 +276,11 @@ func increase_stake(amount: int):
 
     box<UserState> user_state = OpenOrCreateBox(Txn.Sender)
 
-    update_state(app_global_get(CURRENT_PERIOD_INDEX_KEY))
+    update_state(Global.LatestTimestamp)
     update_user_state(Txn.Sender)
 
     check_received_talgo(Txn.GroupIndex - 1, amount)
     user_state.staked_amount = user_state.staked_amount + amount
-
-    send_stalgo(amount, Txn.Sender)
 
     if !user_state.staked_amount:
         current_tiny_power = get_account_voting_power(Txn.Sender)
@@ -232,6 +290,8 @@ func increase_stake(amount: int):
         total_staker_count = total_staker_count + 1
         app_global_put(TOTAL_STAKER_COUNT_KEY, total_staker_count)
     end
+
+    send_stalgo(amount, Txn.Sender)
 
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
     total_staked_amount = total_staked_amount + amount
@@ -245,13 +305,14 @@ func increase_stake(amount: int):
 end
 
 
+# Permission: user
 @public()
 func decrease_stake(amount: int):
     int total_staker_count
 
     box<UserState> user_state = OpenBox(Txn.Sender)
 
-    update_state(app_global_get(CURRENT_PERIOD_INDEX_KEY))
+    update_state(Global.LatestTimestamp)
     update_user_state(Txn.Sender)
 
     assert(amount > 0)
@@ -280,11 +341,12 @@ func decrease_stake(amount: int):
 end
 
 
+# Permission: user
 @public()
 func claim_rewards():
     box<UserState> user_state = OpenBox(Txn.Sender)
 
-    update_state(app_global_get(CURRENT_PERIOD_INDEX_KEY))
+    update_state(Global.LatestTimestamp)
     update_user_state(Txn.Sender)
 
     int amount = user_state.accumulated_rewards
@@ -305,6 +367,7 @@ func send_stalgo(amount: int, receiver: bytes[32]):
     inner_txn:
         TypeEnum: Axfer
         Sender: Global.CurrentApplicationAddress
+        AssetSender: Global.CurrentApplicationAddress
         AssetReceiver: receiver
         AssetAmount: amount
         XferAsset: app_global_get(STALGO_ASSET_ID_KEY)
