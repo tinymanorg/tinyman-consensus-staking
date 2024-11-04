@@ -6,10 +6,11 @@ from algosdk.logic import get_application_address
 from algojig import get_suggested_params
 from algojig.ledger import JigLedger
 
-from tinyman.utils import int_to_bytes
+from tinyman.utils import int_to_bytes, get_global_state
 
 from sdk.constants import *
 from sdk.talgo_staking_client import TAlgoStakingClient, UserState
+from sdk.utils import TAlgoStakingAppGlobalState
 
 from tests.constants import *
 from tests.utils import JigAlgod
@@ -91,9 +92,9 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
                 VAULT_APP_ID_KEY: self.vault_app_id,
                 MANAGER_KEY: decode_address(self.manager_address),
                 TINY_POWER_THRESHOLD_KEY: 1000,
+                LAST_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
-                LAST_REWARD_RATE_PER_TIME_KEY: 0
             }
         )
 
@@ -124,11 +125,28 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
         )
         self.ledger.global_states[self.app_id][STALGO_ASSET_ID_KEY] = self.stalgo_asset_id
 
+    def imitate_update_state(self, timestamp=None):
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        if timestamp is None:
+            timestamp = now
+
+        global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        assert(global_state.last_update_timestamp < timestamp)
+
+        self.ledger.update_global_state(
+            self.app_id,
+            {
+                ACCUMULATED_REWARDS_PER_UNIT: global_state.get_accumulated_rewards_per_unit(timestamp),
+                LAST_UPDATE_TIMESTAMP_KEY: timestamp
+            }
+        )
+
     def set_reward_rate(self, total_reward_amount=10_000_000, start_timestamp=None, end_timestamp=None):
         if not (start_timestamp and end_timestamp):
             start_timestamp = start_timestamp or int(datetime.now(tz=timezone.utc).timestamp())
             end_timestamp = start_timestamp + WEEK
 
+        self.imitate_update_state(start_timestamp)
         duration = int(end_timestamp - start_timestamp)
         reward_rate_per_time = int(total_reward_amount / duration)
 
