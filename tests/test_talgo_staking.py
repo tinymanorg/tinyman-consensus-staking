@@ -5,6 +5,7 @@ import uuid
 from unittest.mock import ANY
 
 from algojig import print_logs
+from algojig.exceptions import LogicEvalError
 from algojig.ledger import JigLedger
 from algosdk import transaction
 from algosdk.account import generate_account
@@ -12,12 +13,13 @@ from algosdk.encoding import decode_address, encode_address
 from algosdk.logic import get_application_address
 from algosdk.transaction import OnComplete
 
-from tinyman.utils import bytes_to_int, int_to_bytes, TransactionGroup
+from tinyman.utils import bytes_to_int, int_to_bytes, TransactionGroup, get_global_state
 
 from sdk.constants import *
 from sdk.talgo_staking_client import TAlgoStakingClient
 from sdk.event import decode_logs
 from sdk.events import restaking_events
+from sdk.utils import TAlgoStakingAppGlobalState
 
 from tests.constants import talgo_staking_approval_program, talgo_staking_clear_state_program, WEEK, DAY
 from tests.core import TalgoStakingBaseTestCase
@@ -143,7 +145,57 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
         client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
 
     def test_update_state(self):
-        pass
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        self.set_reward_rate(start_timestamp=now)
+
+        self.ledger.next_timestamp = now + WEEK
+        self.talgo_staking_client.update_state(now + WEEK)
+        block = self.ledger.last_block
+        block_txns = block[b"txns"]
+
+        update_state_txn = block_txns[0]
+
+    def test_update_state_fail_passed_expiration(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        self.set_reward_rate(start_timestamp=now, end_timestamp=now + WEEK)
+
+        self.ledger.next_timestamp = now + WEEK + 1
+        with self.assertRaises(LogicEvalError) as e:
+            self.talgo_staking_client.update_state(now + WEEK + 1)
+        self.assertEqual(e.exception.source['line'], 'assert(timestamp <= current_reward_rate_per_time_end_timestamp)')
+
+    def test_apply_rate_change_on_expiration(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        self.set_reward_rate(start_timestamp=now, end_timestamp=now + WEEK)
+
+        old_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.ledger.next_timestamp = now + WEEK + 1
+        self.talgo_staking_client.apply_rate_change()
+
+        block = self.ledger.last_block
+        block_txns = block[b"txns"]
+        apply_rate_change_txn = block_txns[0]
+
+        events = decode_logs(apply_rate_change_txn[b'dt'][b'lg'], restaking_events)
+        apply_rate_change_event = events[-1]
+        self.assertEqual(apply_rate_change_event['current_reward_rate_per_time'], 0)
+
+        global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(global_state.last_update_timestamp, now + WEEK)
+        self.assertEqual(global_state.current_reward_rate_per_time, 0)
+        self.assertEqual(global_state.last_reward_rate_per_time, old_global_state.current_reward_rate_per_time)
 
     def test_increase_stake(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
