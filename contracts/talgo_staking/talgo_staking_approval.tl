@@ -204,13 +204,14 @@ func apply_rate_change():
 end
 
 
-# Validate and get CURRENT_REWARD_RATE_PER_TIME value.
-func get_reward_rate_per_time() int:
+# Validate and get CURRENT_REWARD_RATE_PER_TIME value. Timestamp is parameterized for the call in `apply_rate_change`.
+# It is ensured that timestamp is not in past in `update_state`.
+func get_reward_rate_per_time(timestamp: int) int:
     int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
     int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY)
 
     # Ensure CURRENT_REWARD_RATE_PER_TIME is disabled or still valid.
-    assert(Global.LatestTimestamp <= current_reward_rate_per_time_end_timestamp)
+    assert(timestamp <= current_reward_rate_per_time_end_timestamp)
 
     return current_reward_rate_per_time
 end
@@ -224,20 +225,22 @@ func update_state(timestamp: int):
     int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
 
-    int reward_rate_per_time = get_reward_rate_per_time()
+    int reward_rate_per_time = get_reward_rate_per_time(timestamp)
 
+    assert(last_update_timestamp <= timestamp)
     if total_staked_amount:
-        int time_delta = Global.LatestTimestamp - last_update_timestamp
+        int time_delta = timestamp - last_update_timestamp
 
         # This would overflow if reward_rate_per_time > 18446744073 microunit.
         int reward_rate_per_unit_per_time = (reward_rate_per_time * RPU_SCALER) / total_staked_amount
         accumulated_rewards_per_unit = accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
 
-        app_global_put(LAST_UPDATE_TIMESTAMP_KEY, Global.LatestTimestamp)
         app_global_put(ACCUMULATED_REWARDS_PER_UNIT, accumulated_rewards_per_unit)
     end
 
-    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(last_update_timestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
+    app_global_put(LAST_UPDATE_TIMESTAMP_KEY, timestamp)
+
+    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(timestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
     return
 end
 
