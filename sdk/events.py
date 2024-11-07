@@ -45,14 +45,6 @@ state_event = Event(
 )
 
 
-update_state_event = Event(
-    name="update_state",
-    args=[
-        abi.Argument(arg_type="uint64", name="timestamp"),
-    ]
-)
-
-
 update_user_state_event = Event(
     name="update_user_state",
     args=[
@@ -97,7 +89,7 @@ decrease_stake_event = Event(
 
 
 claim_rewards_event = Event(
-    name="increase_stake",
+    name="claim_rewards",
     args=[
         abi.Argument(arg_type="uint64", name="amount"),
     ]
@@ -110,7 +102,6 @@ restaking_events = [
     state_event,
     set_reward_rate_event,
     apply_rate_change_event,
-    update_state_event,
     user_state_event,
     update_user_state_event,
     increase_stake_event,
