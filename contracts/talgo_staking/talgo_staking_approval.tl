@@ -283,7 +283,6 @@ func increase_stake(amount: int):
     update_user_state(Txn.Sender)
 
     check_received_talgo(Txn.GroupIndex - 1, amount)
-    user_state.staked_amount = user_state.staked_amount + amount
 
     if !user_state.staked_amount:
         current_tiny_power = get_account_voting_power(Txn.Sender)
@@ -294,6 +293,7 @@ func increase_stake(amount: int):
         app_global_put(TOTAL_STAKER_COUNT_KEY, total_staker_count)
     end
 
+    user_state.staked_amount = user_state.staked_amount + amount
     send_stalgo(amount, Txn.Sender)
 
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
