@@ -166,6 +166,11 @@ func set_reward_rate(total_reward_amount: int, end_timestamp: int):
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, end_timestamp)
 
+    # Logging
+    int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
+    int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
+    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(Global.LatestTimestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
+
     log(ARC28Event("set_reward_rate(uint64,uint64,uint64,uint64)", itob(total_reward_amount), itob(Global.LatestTimestamp), itob(end_timestamp), itob(reward_rate_per_time)))
     return
 end
@@ -197,6 +202,12 @@ func apply_rate_change():
         app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
 
         reward_rate_per_time = 0
+
+        # Logging
+        int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
+        int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
+        log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(current_reward_rate_per_time_end_timestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
+
         log(ARC28Event("apply_rate_change(uint64)", itob(reward_rate_per_time)))
     end
 
@@ -240,7 +251,6 @@ func update_state(timestamp: int):
 
     app_global_put(LAST_UPDATE_TIMESTAMP_KEY, timestamp)
 
-    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(timestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
     return
 end
 
@@ -263,10 +273,6 @@ func update_user_state(user_address: bytes[32]):
     user_state.accumulated_rewards_per_unit_at_last_update = accumulated_rewards_per_unit
     user_state.timestamp = Global.LatestTimestamp
 
-    bytes user_state_data
-    _, user_state_data = box_get(user_state)
-    log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
-    log(ARC28Event("update_user_state(address)", Txn.Sender))
     return
 end
 
@@ -299,6 +305,11 @@ func increase_stake(amount: int):
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
     total_staked_amount = total_staked_amount + amount
     app_global_put(TOTAL_STAKED_AMOUNT_KEY, total_staked_amount)
+
+    # Logging
+    int reward_rate_per_time = get_reward_rate_per_time(Global.LatestTimestamp)
+    int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
+    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(Global.LatestTimestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
 
     bytes user_state_data
     _, user_state_data = box_get(user_state)
@@ -336,6 +347,11 @@ func decrease_stake(amount: int):
     total_staked_amount = total_staked_amount - amount
     app_global_put(TOTAL_STAKED_AMOUNT_KEY, total_staked_amount)
 
+    # Logging
+    int reward_rate_per_time = get_reward_rate_per_time(Global.LatestTimestamp)
+    int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
+    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(Global.LatestTimestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
+
     bytes user_state_data
     _, user_state_data = box_get(user_state)
     log(ARC28Event("user_state(address,uint64,uint64,uint64,uint64)", Txn.Sender, user_state_data))
@@ -357,6 +373,12 @@ func claim_rewards():
         send_rewards(amount, Txn.Sender)
         user_state.accumulated_rewards = 0
     end
+
+    # Logging
+    int reward_rate_per_time = get_reward_rate_per_time(Global.LatestTimestamp)
+    int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
+    int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
+    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(Global.LatestTimestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
 
     bytes user_state_data
     _, user_state_data = box_get(user_state)
