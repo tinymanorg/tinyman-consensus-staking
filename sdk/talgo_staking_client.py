@@ -132,7 +132,7 @@ class TAlgoStakingClient(BaseClient):
             )
         ]
 
-        return self._submit(transactions, additional_fees=1)
+        return self._submit(transactions, additional_fees=2)
     
     def decrease_stake(self, amount: int):
         sp = self.get_suggested_params()
