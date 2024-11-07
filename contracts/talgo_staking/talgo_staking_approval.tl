@@ -239,6 +239,8 @@ func update_state():
     int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
     log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(Global.LatestTimestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
+
+    return
 end
 
 
