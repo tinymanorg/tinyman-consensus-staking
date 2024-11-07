@@ -29,6 +29,18 @@ class TAlgoStakingAppGlobalState:
             manager=global_state[MANAGER_KEY],
         )
 
+    def to_globalstate(self) -> dict:
+        return {
+            LAST_REWARD_RATE_PER_TIME_KEY: self.last_reward_rate_per_time,
+            CURRENT_REWARD_RATE_PER_TIME_KEY: self.current_reward_rate_per_time,
+            CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: self.current_reward_rate_per_time_end_timestamp,
+            ACCUMULATED_REWARDS_PER_UNIT: self.accumulated_rewards_per_unit,
+            TOTAL_STAKED_AMOUNT_KEY: self.total_staked_amount,
+            TOTAL_STAKER_COUNT_KEY: self.total_staker_count,
+            LAST_UPDATE_TIMESTAMP_KEY: self.last_update_timestamp,
+            MANAGER_KEY: self.manager,
+        }
+
     def get_current_reward_rate_per_time(self, current_timestamp=None):
         if current_timestamp is None:
             current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
