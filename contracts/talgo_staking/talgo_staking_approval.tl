@@ -141,7 +141,7 @@ func set_reward_rate(total_reward_amount: int, end_timestamp: int):
     assert(end_timestamp > Global.LatestTimestamp)
 
     # Wrap up, accumulate for the last rate.
-    update_state(Global.LatestTimestamp)
+    update_state_internal(Global.LatestTimestamp)
 
     int duration = end_timestamp - Global.LatestTimestamp
     int reward_rate_per_time = total_reward_amount / duration
@@ -192,7 +192,7 @@ func apply_rate_change():
         reward_rate_per_time = current_reward_rate_per_time
 
     else:
-        update_state(current_reward_rate_per_time_end_timestamp)
+        update_state_internal(current_reward_rate_per_time_end_timestamp)
 
         # Save the CURRENT_REWARD_RATE_PER_TIME for increment check in `set_reward_rate`.
         app_global_put(LAST_REWARD_RATE_PER_TIME_KEY, current_reward_rate_per_time)
@@ -231,7 +231,18 @@ end
 # Description: Accumulate rewards. Fails if there is a pending rate change.
 # Permission: anyone.
 @public()
-func update_state(timestamp: int):
+func update_state():
+    update_state_internal(Global.LatestTimestamp)
+
+    # Logging
+    int reward_rate_per_time = get_reward_rate_per_time(Global.LatestTimestamp)
+    int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
+    int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
+    log(ARC28Event("state(uint64,uint64,uint64,uint64)", itob(Global.LatestTimestamp), itob(reward_rate_per_time), itob(accumulated_rewards_per_unit), itob(total_staked_amount)))
+end
+
+
+func update_state_internal(timestamp: int):
     int last_update_timestamp = app_global_get(LAST_UPDATE_TIMESTAMP_KEY)
     int accumulated_rewards_per_unit = app_global_get(ACCUMULATED_REWARDS_PER_UNIT)
     int total_staked_amount = app_global_get(TOTAL_STAKED_AMOUNT_KEY)
@@ -285,7 +296,7 @@ func increase_stake(amount: int):
 
     box<UserState> user_state = OpenOrCreateBox(Txn.Sender)
 
-    update_state(Global.LatestTimestamp)
+    update_state_internal(Global.LatestTimestamp)
     update_user_state(Txn.Sender)
 
     check_received_talgo(Txn.GroupIndex - 1, amount)
@@ -326,7 +337,7 @@ func decrease_stake(amount: int):
 
     box<UserState> user_state = OpenBox(Txn.Sender)
 
-    update_state(Global.LatestTimestamp)
+    update_state_internal(Global.LatestTimestamp)
     update_user_state(Txn.Sender)
 
     assert(amount > 0)
@@ -365,7 +376,7 @@ end
 func claim_rewards():
     box<UserState> user_state = OpenBox(Txn.Sender)
 
-    update_state(Global.LatestTimestamp)
+    update_state_internal(Global.LatestTimestamp)
     update_user_state(Txn.Sender)
 
     int amount = user_state.accumulated_rewards
