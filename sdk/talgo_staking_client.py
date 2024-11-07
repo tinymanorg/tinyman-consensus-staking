@@ -74,7 +74,7 @@ class TAlgoStakingClient(BaseClient):
         return self._submit(transactions)
 
 
-    def update_state(self, timestamp: int):
+    def update_state(self):
         sp = self.get_suggested_params()
 
         transactions = [
@@ -84,7 +84,7 @@ class TAlgoStakingClient(BaseClient):
                 on_complete=transaction.OnComplete.NoOpOC,
                 sp=sp,
                 index=self.app_id,
-                app_args=["update_state", timestamp],
+                app_args=["update_state"],
             )
         ]
 
