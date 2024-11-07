@@ -7,6 +7,7 @@ from algojig import get_suggested_params
 from algojig.ledger import JigLedger
 
 from tinyman.utils import int_to_bytes, get_global_state
+from tinyman.constants import YEAR
 
 from sdk.constants import *
 from sdk.talgo_staking_client import TAlgoStakingClient, UserState
@@ -155,11 +156,16 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
         self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY] = end_timestamp
         self.ledger.set_account_balance(self.application_address, total_reward_amount, self.tiny_asset_id)
 
-    def simulate_user_voting_power(self, account_address=None, locked_amount=1000, lock_end_time=None):
+        return reward_rate_per_time, end_timestamp
+
+    def simulate_user_voting_power(self, account_address=None, locked_amount=1000, lock_start_time = None, lock_end_time=None):
         now = int(datetime.now(tz=timezone.utc).timestamp())
 
+        lock_start_time = lock_start_time or now
+        lock_end_time = lock_end_time or (lock_start_time + 4 * YEAR)
+        assert(lock_start_time < lock_end_time)
+
         account_address = account_address or self.user_address
-        lock_end_time = lock_end_time or (now + 125798400)
         account_state = int_to_bytes(locked_amount) + int_to_bytes(lock_end_time) + int_to_bytes(1) + int_to_bytes(0)
 
         self.ledger.set_box(self.vault_app_id, key=decode_address(account_address), value=account_state)
@@ -167,8 +173,12 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
     def simulate_user_stake(self, account_address=None, staked_amount=100_000, timestamp=None):
         now = int(datetime.now(tz=timezone.utc).timestamp())
 
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+
         account_address = account_address or self.user_address
         timestamp = timestamp or now
+
+        assert timestamp >= current_global_state.last_update_timestamp
 
         user_state = UserState()
         user_state.staked_amount = staked_amount
@@ -187,3 +197,16 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
 
         last_update_timestamp = self.ledger.global_states[self.app_id].get(b"last_update_timestamp", 0)
         self.ledger.global_states[self.app_id][b"last_update_timestamp"] = timestamp if timestamp > last_update_timestamp else last_update_timestamp
+
+    def get_new_talgo_staking_client(self, user_sk, user_address):
+        return TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, user_address, user_sk)
+
+    def get_new_user(self):
+        user_sk, user_address = generate_account()
+        self.ledger.set_account_balance(user_address, 100_000_000)
+
+        return user_sk, user_address
+
+    def get_new_user_client(self):
+        user_sk, user_address = self.get_new_user()
+        return self.get_new_talgo_staking_client(user_sk, user_address)
