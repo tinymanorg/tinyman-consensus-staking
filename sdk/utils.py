@@ -52,15 +52,40 @@ class TAlgoStakingAppGlobalState:
 
         return self.current_reward_rate_per_time
 
+    def calculate_accumulated_rewards_per_unit_delta(self, last_update_timestamp, current_timestamp, current_reward_rate_per_time):
+        if self.total_staked_amount:
+            time_delta = current_timestamp - last_update_timestamp
+            reward_rate_per_unit_per_time = (current_reward_rate_per_time * 1_000_000_000) // self.total_staked_amount
+            return (reward_rate_per_unit_per_time * time_delta)
+        return 0
+
     def get_accumulated_rewards_per_unit(self, current_timestamp=None):
         if current_timestamp is None:
             current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
 
-        if self.total_staked_amount:
-            time_delta = current_timestamp - self.last_update_timestamp
-            reward_rate_per_unit_per_time = (self.get_current_reward_rate_per_time(current_timestamp) * 1_000_000_000) // self.total_staked_amount
-            return self.accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
-        return 0
+        arpu_delta = 0
+        if current_timestamp > self.current_reward_rate_per_time_end_timestamp:
+            # If there is a rate expiration, split the calculation.
+
+            arpu_delta += self.calculate_accumulated_rewards_per_unit_delta(
+                last_update_timestamp=self.last_update_timestamp,
+                current_timestamp=self.current_reward_rate_per_time_end_timestamp,
+                current_reward_rate_per_time=self.get_current_reward_rate_per_time(self.current_reward_rate_per_time_end_timestamp)
+            )
+            arpu_delta += self.calculate_accumulated_rewards_per_unit_delta(
+                last_update_timestamp=self.current_reward_rate_per_time_end_timestamp,
+                current_timestamp=current_timestamp,
+                current_reward_rate_per_time=self.get_current_reward_rate_per_time(current_timestamp)
+            )
+        else:
+            arpu_delta += self.calculate_accumulated_rewards_per_unit_delta(
+                last_update_timestamp=self.last_update_timestamp,
+                current_timestamp=current_timestamp,
+                current_reward_rate_per_time=self.get_current_reward_rate_per_time(current_timestamp)
+            )
+
+        return self.accumulated_rewards_per_unit + arpu_delta
+
 
 def get_accumulated_rewards(user_state, global_state: TAlgoStakingAppGlobalState, current_timestamp=None):
     if current_timestamp is None:
