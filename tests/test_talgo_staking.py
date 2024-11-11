@@ -253,7 +253,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
         block_txns = block[b"txns"]
 
         claim_rewards_transaction = block_txns[1]
-        reward_transfer_itx = claim_rewards_transaction[b"dt"][b"itx"][0]
+        reward_transfer_itx = claim_rewards_transaction[b"dt"][b"itx"][1]
 
         self.assertEqual(reward_transfer_itx[b"txn"][b"xaid"], self.tiny_asset_id)
         self.assertEqual(encode_address(reward_transfer_itx[b"txn"][b"arcv"]), self.user_address)
