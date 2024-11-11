@@ -7,7 +7,7 @@ from algojig import get_suggested_params
 from algojig.ledger import JigLedger
 
 from tinyman.utils import int_to_bytes, get_global_state
-from tinyman.constants import YEAR
+from tinyman.governance.vault.constants import MAX_LOCK_TIME
 
 from sdk.constants import *
 from sdk.talgo_staking_client import TAlgoStakingClient, UserState
@@ -92,7 +92,7 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
                 TINY_ASSET_ID_KEY: self.tiny_asset_id,
                 VAULT_APP_ID_KEY: self.vault_app_id,
                 MANAGER_KEY: decode_address(self.manager_address),
-                TINY_POWER_THRESHOLD_KEY: 1000,
+                TINY_POWER_THRESHOLD_KEY: 500_000_000,
                 LAST_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
@@ -158,11 +158,15 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
 
         return reward_rate_per_time, end_timestamp
 
-    def simulate_user_voting_power(self, account_address=None, locked_amount=1000, lock_start_time = None, lock_end_time=None):
+    def simulate_user_voting_power(self, account_address=None, locked_amount=510_000_000, lock_start_time = None, lock_end_time=None):
+        """
+        For MAX_LOCK_TIME, locked_amount is equivalent to voting power. Added +10_000_000 microunits for rounding errors and keeping the power enough over a time span.
+        """
+
         now = int(datetime.now(tz=timezone.utc).timestamp())
 
         lock_start_time = lock_start_time or now
-        lock_end_time = lock_end_time or (lock_start_time + 4 * YEAR)
+        lock_end_time = lock_end_time or (lock_start_time + MAX_LOCK_TIME)
         assert(lock_start_time < lock_end_time)
 
         account_address = account_address or self.user_address

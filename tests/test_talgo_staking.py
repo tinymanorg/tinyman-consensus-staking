@@ -73,7 +73,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
                 TINY_ASSET_ID_KEY: self.tiny_asset_id,
                 VAULT_APP_ID_KEY: self.vault_app_id,
                 MANAGER_KEY: decode_address(self.manager_address),
-                TINY_POWER_THRESHOLD_KEY: 1000,
+                TINY_POWER_THRESHOLD_KEY: 500_000_000,
                 CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
                 LAST_REWARD_RATE_PER_TIME_KEY: 0
@@ -119,7 +119,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
                 TINY_ASSET_ID_KEY: self.tiny_asset_id,
                 VAULT_APP_ID_KEY: self.vault_app_id,
                 MANAGER_KEY: decode_address(self.manager_address),
-                TINY_POWER_THRESHOLD_KEY: 1000,
+                TINY_POWER_THRESHOLD_KEY: 500_000_000,
                 CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
                 LAST_REWARD_RATE_PER_TIME_KEY: 0
@@ -527,7 +527,25 @@ class IncreaseStakeTests(TalgoStakingBaseTestCase):
     def setUp(self):
         super().setUp()
         self.ledger.set_account_balance(self.user_address, int(1e16))
-    
+
+    def test_increase_stake_without_power(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        reward_rate_per_time, _ = self.set_reward_rate(start_timestamp=now, end_timestamp=now + 2 * WEEK)
+
+        self.simulate_user_voting_power(locked_amount=499_000_000)
+
+        # Increase Stake
+        self.ledger.next_timestamp = now + 1
+        self.ledger.next_timestamp = now + DAY
+        self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
+        with self.assertRaises(LogicEvalError) as e:
+            self.talgo_staking_client.increase_stake(100_000)
+        self.assertEqual(e.exception.source['line'], 'assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))')
+
     def test_first_increase_stake(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
         self.ledger.set_account_balance(self.application_address, 10_000_000)
@@ -957,6 +975,29 @@ class ClaimRewardsTests(TalgoStakingBaseTestCase):
     def setUp(self):
         super().setUp()
         self.ledger.set_account_balance(self.user_address, int(1e16))
+    
+    def test_claim_rewards_without_power(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        reward_rate_per_time, _ = self.set_reward_rate(start_timestamp=now, end_timestamp=now + 2 * WEEK)
+
+        self.simulate_user_voting_power()
+
+        # Increase Stake
+        self.ledger.next_timestamp = now + DAY
+        self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
+        self.talgo_staking_client.increase_stake(100_000)
+
+        # Claim Rewards
+        self.ledger.next_timestamp = now + DAY + 1
+        self.simulate_user_voting_power(locked_amount=499_000_000)
+
+        with self.assertRaises(LogicEvalError) as e:
+            self.talgo_staking_client.claim_rewards()
+        self.assertEqual(e.exception.source['line'], 'assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))')
 
     def test_claim_rewards(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -1014,11 +1055,17 @@ class ClaimRewardsTests(TalgoStakingBaseTestCase):
         # Inner Transaction Checks
         inner_txns = claim_rewards_txn[b'dt'][b'itx']
 
-        self.assertEqual(inner_txns[0][b'txn'][b'type'], b'axfer')
-        self.assertEqual(inner_txns[0][b'txn'][b'xaid'], self.tiny_asset_id)
+        self.assertEqual(inner_txns[0][b'txn'][b'type'], b'appl')
+        self.assertEqual(inner_txns[0][b'txn'][b'apid'], self.vault_app_id)
         self.assertEqual(inner_txns[0][b'txn'][b'snd'], decode_address(self.application_address))
-        self.assertEqual(inner_txns[0][b'txn'][b'arcv'], decode_address(self.user_address))
-        self.assertEqual(inner_txns[0][b'txn'][b'aamt'], accumulated_rewards)
+        self.assertEqual(inner_txns[0][b'txn'][b'apaa'][0], b'get_tiny_power_of')
+        self.assertEqual(inner_txns[0][b'txn'][b'apaa'][1], decode_address(self.user_address))
+
+        self.assertEqual(inner_txns[1][b'txn'][b'type'], b'axfer')
+        self.assertEqual(inner_txns[1][b'txn'][b'xaid'], self.tiny_asset_id)
+        self.assertEqual(inner_txns[1][b'txn'][b'snd'], decode_address(self.application_address))
+        self.assertEqual(inner_txns[1][b'txn'][b'arcv'], decode_address(self.user_address))
+        self.assertEqual(inner_txns[1][b'txn'][b'aamt'], accumulated_rewards)
 
     def test_claim_rewards_without_stake(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
