@@ -168,11 +168,13 @@ class TAlgoStakingClient(BaseClient):
                 sp=sp,
                 index=self.app_id,
                 app_args=["claim_rewards"],
+                foreign_apps=[self.vault_app_id],
                 foreign_assets=[self.tiny_asset_id],
                 boxes=[
                     (0, user_state_box_name),
+                    (self.vault_app_id, user_state_box_name),
                 ],
             )
         ]
 
-        return self._submit(transactions, additional_fees=2)
+        return self._submit(transactions, additional_fees=3)
