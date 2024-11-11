@@ -66,7 +66,7 @@ func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: i
     app_global_put(TINY_ASSET_ID_KEY, tiny_asset_id)
     app_global_put(VAULT_APP_ID_KEY, vault_app_id)
     app_global_put(MANAGER_KEY, manager_address)
-    app_global_put(TINY_POWER_THRESHOLD_KEY, 1000)
+    app_global_put(TINY_POWER_THRESHOLD_KEY, 500000000)
 
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
@@ -109,6 +109,7 @@ func init():
 end
 
 
+# Permission: manager
 @public()
 func set_manager(new_manager: bytes[32]):
     bytes[32] user_address = Txn.Sender
@@ -383,6 +384,9 @@ func claim_rewards():
 
     int amount = user_state.accumulated_rewards
     if amount:
+        int current_tiny_power = get_account_voting_power(Txn.Sender)
+        assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))
+
         send_rewards(amount, Txn.Sender)
         user_state.accumulated_rewards = 0
     end
