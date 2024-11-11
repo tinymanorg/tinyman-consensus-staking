@@ -9,8 +9,8 @@ talgo_staking_approval_program = TealishProgram("contracts/talgo_staking/talgo_s
 talgo_staking_clear_state_program = TealishProgram("contracts/talgo_staking/talgo_staking_clear_state.tl")
 
 # Added for test dependency.
-vault_approval_program = TealishProgram("contracts/vault/vault_approval.tl")
-vault_clear_state_program = TealishProgram("contracts/vault/vault_clear_state.tl")
+vault_approval_program = TealishProgram("tests/vault/vault_approval.tl")
+vault_clear_state_program = TealishProgram("tests/vault/vault_clear_state.tl")
 
 APP_LOCAL_INTS = 0
 APP_LOCAL_BYTES = 0
