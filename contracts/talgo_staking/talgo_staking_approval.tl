@@ -18,7 +18,8 @@ const bytes TALGO_ASSET_ID_KEY = "talgo_asset_id"
 const bytes STALGO_ASSET_ID_KEY = "stalgo_asset_id"
 
 const int MAX_RATE_INCREMENT_PERCENTAGE = 10
-const bytes LAST_REWARD_RATE_PER_TIME_KEY = "last_reward_rate_per_time"
+const bytes TOTAL_REWARD_AMOUNT_SUM_KEY = "total_reward_amount_sum"
+const bytes TOTAL_CLAIMED_REWARD_AMOUNT_KEY = "total_claimed_reward_amount"
 const bytes CURRENT_REWARD_RATE_PER_TIME_KEY = "current_reward_rate_per_time"
 const bytes CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY = "current_reward_rate_per_time_end_timestamp"
 const bytes ACCUMULATED_REWARDS_PER_UNIT = "accumulated_rewards_per_unit"
@@ -70,7 +71,7 @@ func create_application(talgo_asset_id: int, tiny_asset_id: int, vault_app_id: i
 
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
-    app_global_put(LAST_REWARD_RATE_PER_TIME_KEY, 0)
+    app_global_put(TOTAL_CLAIMED_REWARD_AMOUNT_KEY, 0)
 
     # create_application(talgo_asset_id, tiny_asset_id, manager_address, stalgo_asset_id)
     log(ARC28Event("create_application(uint64,uint64,uint64,address)", itob(talgo_asset_id), itob(tiny_asset_id), itob(vault_app_id), manager_address))
@@ -147,23 +148,28 @@ func set_reward_rate(total_reward_amount: int, end_timestamp: int):
     int duration = end_timestamp - Global.LatestTimestamp
     int reward_rate_per_time = total_reward_amount / duration
 
+    # Calculate the needed balance.
+    int total_reward_amount_sum = app_global_get(TOTAL_REWARD_AMOUNT_SUM_KEY)
+    int total_claimed_reward_amount = app_global_get(TOTAL_CLAIMED_REWARD_AMOUNT_KEY)
     int current_reward_rate_per_time_end_timestamp = app_global_get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY)
-    int last_current_reward_rate_per_time = app_global_get(LAST_REWARD_RATE_PER_TIME_KEY)
-    int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
 
-    int max_rate_per_time
-    if last_current_reward_rate_per_time < current_reward_rate_per_time:
-        max_rate_per_time = current_reward_rate_per_time
-    else:
-        max_rate_per_time = last_current_reward_rate_per_time
-    end
-    max_rate_per_time = max_rate_per_time + ((max_rate_per_time * MAX_RATE_INCREMENT_PERCENTAGE) / 100)
+    if Global.LatestTimestamp < current_reward_rate_per_time_end_timestamp:
+        int current_reward_rate_per_time = app_global_get(CURRENT_REWARD_RATE_PER_TIME_KEY)
+        int remaining_from_current_rate = (current_reward_rate_per_time * (current_reward_rate_per_time_end_timestamp - Global.LatestTimestamp))
 
-    # Check is disabled for initialization.
-    if max_rate_per_time:
-        assert(reward_rate_per_time < max_rate_per_time)
+        # Subtract the amount that won't be distributed from the current rate.
+        total_reward_amount_sum = total_reward_amount_sum - remaining_from_current_rate
     end
 
+    total_reward_amount_sum = total_reward_amount_sum + total_reward_amount
+    int balance_needed = total_reward_amount_sum - total_claimed_reward_amount
+
+    # Check TINY balance such that it is enough for both unpaid rewards and future rewards.
+    int tiny_balance
+    _, tiny_balance = asset_holding_get(AssetBalance, Global.CurrentApplicationAddress, app_global_get(TINY_ASSET_ID_KEY))
+    assert(tiny_balance >= balance_needed)
+
+    app_global_put(TOTAL_REWARD_AMOUNT_SUM_KEY, total_reward_amount_sum)
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_KEY, reward_rate_per_time)
     app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, end_timestamp)
 
@@ -194,9 +200,6 @@ func apply_rate_change():
 
     else:
         update_state_internal(current_reward_rate_per_time_end_timestamp)
-
-        # Save the CURRENT_REWARD_RATE_PER_TIME for increment check in `set_reward_rate`.
-        app_global_put(LAST_REWARD_RATE_PER_TIME_KEY, current_reward_rate_per_time)
 
         # Update the CURRENT_REWARD_RATE_PER_TIME to 0.
         app_global_put(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
@@ -386,6 +389,10 @@ func claim_rewards():
     if amount:
         int current_tiny_power = get_account_voting_power(Txn.Sender)
         assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))
+
+        int total_claimed_reward_amount = app_global_get(TOTAL_CLAIMED_REWARD_AMOUNT_KEY)
+        total_claimed_reward_amount = total_claimed_reward_amount + amount
+        app_global_put(TOTAL_CLAIMED_REWARD_AMOUNT_KEY, total_claimed_reward_amount)
 
         send_rewards(amount, Txn.Sender)
         user_state.accumulated_rewards = 0
