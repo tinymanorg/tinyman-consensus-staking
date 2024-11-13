@@ -149,7 +149,7 @@ func mint(algo_amount: int):
     # If the balance is too high minting is not available until the accounts are rebalanced with move_stake (or stake is reduced)
     # We can assume the balances of accounts 1-4 are kept below the max through the manual move_stake operations 
     #  because they only gain algo through move_stake or rewards
-    assert(balance(app_global_get("account_0")) < app_global_get("max_account_balance"))
+    assert(balance(app_global_get("account_0")) <= app_global_get("max_account_balance"))
     # 1. Update state to account for rewards received since the last operation
     update_rewards_and_rate(algo_amount, 0)
     log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
