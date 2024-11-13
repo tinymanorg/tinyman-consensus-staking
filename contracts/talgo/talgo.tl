@@ -262,6 +262,7 @@ func set_protocol_fee(fee_amount: int):
     bytes[32] user_address = Txn.Sender
     assert(user_address == app_global_get("manager"))
 
+    assert(fee_amount <= 100)
     app_global_put("protocol_fee", fee_amount)
     log(ARC28Event("set_protocol_fee(uint64)", fee_amount))
     return
