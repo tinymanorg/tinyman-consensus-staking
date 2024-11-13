@@ -151,7 +151,7 @@ func mint(algo_amount: int):
     #  because they only gain algo through move_stake or rewards
     assert(balance(app_global_get("account_0")) < app_global_get("max_account_balance"))
     # 1. Update state to account for rewards received since the last operation
-    update_rewards_and_rate(algo_amount)
+    update_rewards_and_rate(algo_amount, 0)
     log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     # 2. Calculate the amount of tAlgo for the given Algo
     int talgo_amount = calc_talgo(algo_amount)
@@ -172,7 +172,7 @@ func burn(talgo_amount: int):
     assert(Gtxn[-1].AssetReceiver == Global.CurrentApplicationAddress)
     assert(Gtxn[-1].XferAsset == app_global_get("talgo_asset_id"))
     # 1. Update state to account for rewards received since the last operation
-    update_rewards_and_rate(0)
+    update_rewards_and_rate(0, talgo_amount)
     log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     # 2. Calculate the amount of Algo for the given tAlgo
     int algo_amount = calc_algo(talgo_amount)
@@ -203,7 +203,7 @@ end
 # permission: anyone
 @public()
 func sync():
-    update_rewards_and_rate(0)
+    update_rewards_and_rate(0, 0)
     log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
     return
 end
@@ -359,14 +359,24 @@ func ascii_digit(i: int) bytes:
 end
 
 
-func update_rewards_and_rate(delta: int):
-    int minted_talgo = app_global_get("minted_talgo")
+func update_rewards_and_rate(algo_delta: int, talgo_delta: int):
+    # Calculate the minted tAlgo from the current balance of tAlgo.
+    # This effectively means tAlgo donations get absorbed and become Algo donations rather than locked tAlgo.
+    int talgo_balance
+    _, talgo_balance = asset_holding_get(AssetBalance, Global.CurrentApplicationAddress, app_global_get("talgo_asset_id"))
+    #talgo_delta is the additional balance transferred in this txn group that we want to ignore for now
+    talgo_balance = talgo_balance - talgo_delta
+    # protocol_talgo is minted but still in this account
+    talgo_balance = talgo_balance - app_global_get("protocol_talgo")
+    int minted_talgo = TALGO_TOTAL_SUPPLY - talgo_balance
+    assert(app_global_get("minted_talgo") == minted_talgo)
     if !minted_talgo:
         return
     end
-    # delta is the additional balance transferred in this txn group that we want to ignore for now
+
+    # algo_delta is the additional balance transferred in this txn group that we want to ignore for now
     # we are only interested in calculating rewards/donations since the last txn 
-    int algo_balance = full_balance() - delta
+    int algo_balance = full_balance() - algo_delta
     int new_rewards = algo_balance - app_global_get("algo_balance")
     app_global_put("total_rewards", app_global_get("total_rewards") + new_rewards)
     app_global_put("algo_balance", algo_balance)
