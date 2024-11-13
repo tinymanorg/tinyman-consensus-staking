@@ -315,6 +315,48 @@ class TestSetup(unittest.TestCase):
         self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), int(half_algo_amount))
         self.assertEqual(self.ledger.get_account_balance(self.t_algo_client.user_address, talgo_asset_id)[0], half_talgo_amount)
 
+
+    def test_mint_and_donations(self):
+        self.t_algo_client.init()
+        self.ledger.update_global_state(self.app_id, {b"protocol_fee": 0})
+        talgo_asset_id = self.t_algo_client.get_global(b"talgo_asset_id")
+        expected_algo_balance = 0
+        expected_minted_talgo = 0
+        expected_user_talgo_balance = 0
+
+        # Mint 10M Algo
+        algo_amount = int(10e12)
+        expected_rate = 1 * RATE_SCALER
+        expected_talgo_amount = int(algo_amount * RATE_SCALER / expected_rate)
+        expected_algo_balance += algo_amount
+        expected_minted_talgo += expected_talgo_amount
+        expected_user_talgo_balance += expected_talgo_amount
+        self.t_algo_client.mint(algo_amount)
+
+        self.assertEqual(self.t_algo_client.get_global(b"minted_talgo"), expected_minted_talgo)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), algo_amount)
+
+        # Add 10 Algo donation/reward to account
+        algo_donation = 10_000_000
+        self.ledger.add(self.application_address, algo_donation)
+        self.t_algo_client.sync()
+
+        expected_algo_balance += algo_donation
+        expected_rate = int((expected_algo_balance * RATE_SCALER) / expected_minted_talgo)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), expected_algo_balance)
+        self.assertEqual(self.t_algo_client.get_global(b"rate"), expected_rate)
+
+        # Add 10 tAlgo donation to account
+        talgo_donation = 10_000_000
+        self.ledger.move(talgo_donation, talgo_asset_id, self.user_address, self.application_address)
+        self.t_algo_client.sync()
+
+        expected_minted_talgo -= talgo_donation
+        self.assertEqual(self.t_algo_client.get_global(b"minted_talgo"), expected_minted_talgo)
+        expected_rate = int((expected_algo_balance * RATE_SCALER) / expected_minted_talgo)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), expected_algo_balance)
+        self.assertEqual(self.t_algo_client.get_global(b"rate"), expected_rate)
+
     def test_go_online(self):
         self.ledger.set_global_state(self.app_id, {"node_manager_1": decode_address(self.user_address)})
         self.t_algo_client.init()
