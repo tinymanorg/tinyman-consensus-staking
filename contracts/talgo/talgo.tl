@@ -2,7 +2,7 @@
 
 # This is a singleton app.
 # This app manages up to 5 accounts that can be brought online to participate in consensus.
-# The accounts potentially earn Algo through incestivised consensus when online.
+# The accounts potentially earn Algo through incentivised consensus when online.
 # The app issues tAlgo in exchange for Algo.
 # The Algo in the accounts is collectively owned by the holders of tAlgo.
 # The accounts can be brought online for a node by the node_manager account set for each account.
@@ -16,12 +16,6 @@ const int TALGO_TOTAL_SUPPLY = 10_000_000_000_000_000
 
 # The rate of Algo/tAlgo is scaled by this value for integer storage and calculation
 const int RATE_SCALER = 1_000_000_000_000
-
-# The Algorand protocol limit is 70M Algo per online account to remain eligible for proposer rewards. 
-# We set 69M to allow space for rewards to accumulate.
-# This means a max of 345M Algo (69M*5) can be staked with tAlgo
-# TODO: this might be made configurable or dependant on a protocol field
-const int MAX_ACCOUNT_BALANCE = 69_000_000_000_000
 
 # A simple app that rekeys its account to the creator on creation. See auxapp.tl
 const bytes AUX_PROGRAM = "\n1\x18\x81\x00\x12D\xb1\x81\x01\xb2\x101\x00\xb2\x071\x00\xb2 \x81\x00\xb2\x01\xb3\x81\x01C"
@@ -46,6 +40,7 @@ router:
     set_stake_manager
     set_fee_collector
     set_protocol_fee
+    set_max_account_balance
     change_online_status
 end
 
@@ -75,6 +70,12 @@ func create_application(manager_address: bytes[32]):
 
     # The percentage of rewards claimable by the protocol (Tinyman)
     app_global_put("protocol_fee", 10)
+
+    # The Algorand protocol limit is currently 70M Algo per online account to remain eligible for proposer rewards. 
+    # This means a max of 350M Algo (70M*5) can be staked with tAlgo with the current limits.
+    # We set the max to 65M Algo to allow space for rewards to accumulate.
+    # This is configurable with set_max_account_balance to allow for future protocol changes.
+    app_global_put("max_account_balance", 65_000_000_000_000)
     
     # create_application(manager_address)
     log(ARC28Event("create_application(address)", manager_address))
@@ -146,7 +147,7 @@ func mint(algo_amount: int):
     # If the balance is too high minting is not available until the accounts are rebalanced with move_stake (or stake is reduced)
     # We can assume the balances of accounts 1-4 are kept below the max through the manual move_stake operations 
     #  because they only gain algo through move_stake or rewards
-    assert(balance(app_global_get("account_0")) < MAX_ACCOUNT_BALANCE)
+    assert(balance(app_global_get("account_0")) < app_global_get("max_account_balance"))
     # 1. Update state to account for rewards received since the last operation
     update_rewards_and_rate(algo_amount)
     log(ARC28Event("rate_update(uint64)", itob(app_global_get("rate"))))
@@ -262,6 +263,18 @@ func set_protocol_fee(fee_amount: int):
 
     app_global_put("protocol_fee", fee_amount)
     log(ARC28Event("set_protocol_fee(uint64)", fee_amount))
+    return
+end
+
+
+# permission: manager
+@public()
+func set_max_account_balance(max_amount: int):
+    bytes[32] user_address = Txn.Sender
+    assert(user_address == app_global_get("manager"))
+
+    app_global_put("max_account_balance", max_amount)
+    log(ARC28Event("set_max_account_balance(uint64)", max_amount))
     return
 end
 
