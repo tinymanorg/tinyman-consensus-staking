@@ -367,12 +367,11 @@ func update_rewards_and_rate(algo_delta: int, talgo_delta: int):
     # This effectively means tAlgo donations get absorbed and become Algo donations rather than locked tAlgo.
     int talgo_balance
     _, talgo_balance = asset_holding_get(AssetBalance, Global.CurrentApplicationAddress, app_global_get("talgo_asset_id"))
-    #talgo_delta is the additional balance transferred in this txn group that we want to ignore for now
+    # talgo_delta is the additional balance transferred in this txn group that we want to ignore for now
     talgo_balance = talgo_balance - talgo_delta
     # protocol_talgo is minted but still in this account
     talgo_balance = talgo_balance - app_global_get("protocol_talgo")
     int minted_talgo = TALGO_TOTAL_SUPPLY - talgo_balance
-    assert(app_global_get("minted_talgo") == minted_talgo)
     if !minted_talgo:
         return
     end
