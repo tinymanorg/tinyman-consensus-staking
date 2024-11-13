@@ -14,7 +14,7 @@ class TAlgoClient(BaseClient):
                 sender=self.user_address,
                 receiver=self.application_address,
                 sp=sp,
-                amt=2_000_000,
+                amt=600_000,
             ),
             transaction.ApplicationCallTxn(
                 sender=self.user_address,
@@ -43,7 +43,9 @@ class TAlgoClient(BaseClient):
                     encode_address(self.get_global(b"account_3")),
                     encode_address(self.get_global(b"account_4")),
                 ],
-                foreign_assets=[]
+                foreign_assets=[
+                    self.get_global(b"talgo_asset_id"),
+                ]
             ),
         ]
         return self._submit(transactions, additional_fees=0)
@@ -183,6 +185,69 @@ class TAlgoClient(BaseClient):
         ]
         return self._submit(transactions, additional_fees=0)
     
+    def set_fee_collector(self, new_fee_collector):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["set_fee_collector", decode_address(new_fee_collector)],
+                accounts=[
+                ],
+                foreign_assets=[]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=0)
+    
+    def propose_manager(self, new_manager):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["propose_manager", decode_address(new_manager)],
+                accounts=[
+                ],
+                foreign_assets=[]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=0)
+    
+    def accept_manager(self):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["accept_manager"],
+                accounts=[
+                ],
+                foreign_assets=[]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=0)
+
+    def set_stake_manager(self, new_stake_manager):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["set_stake_manager", decode_address(new_stake_manager)],
+                accounts=[
+                ],
+                foreign_assets=[]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=0)
 
     def move_stake(self, from_node_index, to_node_index, amount):
         sp = self.get_suggested_params()

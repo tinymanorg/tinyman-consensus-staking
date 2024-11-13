@@ -9,6 +9,7 @@ from algojig import print_logs
 from algojig import get_suggested_params
 from algojig.ledger import JigLedger
 from algojig import TealishProgram
+from algojig.exceptions import LogicEvalError
 from algosdk import transaction
 from algosdk.account import generate_account
 from algosdk.encoding import decode_address, encode_address
@@ -78,6 +79,7 @@ class TestSetup(unittest.TestCase):
                 b"node_manager_1": decode_address(app_creator_address),
                 b"fee_collector": decode_address(app_creator_address),
                 b"protocol_fee": 10,
+                b"max_account_balance": 65_000_000_000_000,
             }
         )
 
@@ -92,7 +94,7 @@ class TestSetup(unittest.TestCase):
             transaction.ApplicationCreateTxn(
                 sender=account_address,
                 sp=self.sp,
-                app_args=["create_application", decode_address(account_address)],
+                app_args=["create_application"],
                 on_complete=OnComplete.NoOpOC,
                 approval_program=talgo_approval_program.bytecode,
                 clear_program=talgo_clear_state_program.bytecode,
@@ -120,6 +122,7 @@ class TestSetup(unittest.TestCase):
                 b'fee_collector': decode_address(account_address),
                 b'stake_manager': decode_address(account_address),
                 b'protocol_fee': 10,
+                b'max_account_balance': 65_000_000_000_000,
             }
         )
 
@@ -151,7 +154,6 @@ class TestSetup(unittest.TestCase):
 
         self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), int(10e12))
         self.assertEqual(self.ledger.get_account_balance(self.t_algo_client.user_address, talgo_asset_id)[0], expected_talgo_amount)
-
 
     def test_mint_and_rewards(self):
         self.t_algo_client.init()
@@ -265,7 +267,6 @@ class TestSetup(unittest.TestCase):
         expected_algo_balance += algo_amount
         expected_minted_talgo += expected_talgo_amount
         self.t_algo_client.mint(algo_amount)
-
         self.t_algo_client.burn(expected_talgo_amount)
         logs = self.ledger.last_block[b'txns'][1][b'dt'][b'lg']
         events = decode_logs(logs, talgo_events)
@@ -332,31 +333,131 @@ class TestSetup(unittest.TestCase):
         fee = 2_000_000
         self.t_algo_client.go_online(node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee)
         a = encode_address(self.t_algo_client.get_global(b"account_1"))
-        print(self.ledger.get_raw_account(a))
+        # print(self.ledger.get_raw_account(a))
 
         self.t_algo_client.go_offline(node_index)
-        print(self.ledger.get_raw_account(a))
+        # print(self.ledger.get_raw_account(a))
 
-    def test_set_node_manager(self):
-        self.ledger.set_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+    def test_go_offline_fail(self):
+        address_a = generate_account()[1]
+        self.ledger.set_global_state(self.app_id, {"node_manager_1": decode_address(address_a)})
         self.t_algo_client.init()
-        self.t_algo_client.set_node_manager(0, self.user_address)
-
+        node_index = 1
+        with self.assertRaises(LogicEvalError) as e:
+            self.t_algo_client.go_offline(node_index)
+        self.assertEqual(e.exception.source["line"], 'assert(user_address == app_global_get(concat("node_manager_", ascii_digit(node_index))))')
 
     def test_move_stake(self):
-        self.ledger.set_global_state(self.app_id, {
+        self.ledger.update_global_state(self.app_id, {
             "manager": decode_address(self.user_address),
             "stake_manager": decode_address(self.user_address),
         })
         self.t_algo_client.init()
-        self.t_algo_client.mint(int(10e12))
-        self.t_algo_client.move_stake(0, 1, int(5e12))
-
+        amount = int(10e12)
+        half_amount = int(5e12)
+        account_0_min_balance = 200_000
+        account_1_min_balance = 100_000
+        self.t_algo_client.mint(amount)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), amount)
+        self.assertEqual(self.ledger.get_account_balance(encode_address(self.t_algo_client.get_global(b"account_0")), 0)[0], amount + account_0_min_balance)
+        self.t_algo_client.move_stake(0, 1, half_amount)
+        self.assertEqual(self.t_algo_client.get_global(b"algo_balance"), amount)
+        self.assertEqual(self.ledger.get_account_balance(encode_address(self.t_algo_client.get_global(b"account_0")), 0)[0], half_amount + account_0_min_balance)
+        self.assertEqual(self.ledger.get_account_balance(encode_address(self.t_algo_client.get_global(b"account_1")), 0)[0], half_amount + account_1_min_balance)
 
     def test_claim_protocol_rewards(self):
         self.t_algo_client.init()
-        self.t_algo_client.mint(1_000_000)
+        self.t_algo_client.mint(100_000_000)
         self.ledger.add(self.application_address, 1_000_000)
         self.t_algo_client.sync()
+        self.assertEqual(self.t_algo_client.get_global(b"protocol_talgo"), 99108)
         self.ledger.set_account_balance(self.app_creator_address, 0, asset_id=self.t_algo_client.get_global(b"talgo_asset_id"))
         self.t_algo_client.claim_protocol_rewards()
+        self.assertEqual(self.t_algo_client.get_global(b"protocol_talgo"), 0)
+
+    def test_set_stake_manager(self):
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+        address = generate_account()[1]
+        self.t_algo_client.init()
+        self.t_algo_client.set_stake_manager(address)
+        self.assertEqual(self.t_algo_client.get_global(b"stake_manager"), decode_address(address))
+
+    def test_set_stake_manager_fail(self):
+        address_a = generate_account()[1]
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(address_a)})
+        address = generate_account()[1]
+        self.t_algo_client.init()
+        with self.assertRaises(LogicEvalError) as e:
+            self.t_algo_client.set_stake_manager(address)
+        self.assertEqual(e.exception.source["line"], 'assert(user_address == app_global_get("manager"))')
+
+    def test_set_node_manager(self):
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+        address = generate_account()[1]
+        self.t_algo_client.init()
+        self.t_algo_client.set_node_manager(0, address)
+        self.assertEqual(self.t_algo_client.get_global(b"node_manager_0"), decode_address(address))
+
+    def test_set_node_manager_1(self):
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+        address = generate_account()[1]
+        self.t_algo_client.init()
+        self.t_algo_client.set_node_manager(1, address)
+        self.assertEqual(self.t_algo_client.get_global(b"node_manager_1"), decode_address(address))
+
+    def test_set_node_manager_fail(self):
+        address_a = generate_account()[1]
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(address_a)})
+        address = generate_account()[1]
+        self.t_algo_client.init()
+        with self.assertRaises(LogicEvalError) as e:
+            self.t_algo_client.set_node_manager(0, address)
+        self.assertEqual(e.exception.source["line"], 'assert(user_address == app_global_get("manager"))')
+
+    def test_set_fee_collector(self):
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+        address = generate_account()[1]
+        self.t_algo_client.init()
+        self.t_algo_client.set_fee_collector(address)
+        self.assertEqual(self.t_algo_client.get_global(b"fee_collector"), decode_address(address))
+
+    def test_set_fee_collector_fail(self):
+        address_a = generate_account()[1]
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(address_a)})
+        address = generate_account()[1]
+        self.t_algo_client.init()
+        with self.assertRaises(LogicEvalError) as e:
+            self.t_algo_client.set_fee_collector(address)
+        self.assertEqual(e.exception.source["line"], 'assert(user_address == app_global_get("manager"))')
+
+    def test_propose_and_accept_manager(self):
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+        sk, address1 = generate_account()
+        self.t_algo_client.add_key(address1, sk)
+        self.ledger.set_account_balance(address1, 1_000_000)
+
+        sk, address2 = generate_account()
+        self.t_algo_client.add_key(address2, sk)
+        self.ledger.set_account_balance(address2, 1_000_000)
+
+        self.t_algo_client.init()
+        self.t_algo_client.propose_manager(address1)
+        self.assertEqual(self.t_algo_client.get_global(b"proposed_manager"), decode_address(address1))
+        self.assertEqual(self.t_algo_client.get_global(b"manager"), decode_address(self.user_address))
+        
+        # Try to accept from a different address
+        self.t_algo_client.user_address = address2
+        with self.assertRaises(LogicEvalError) as e:
+            self.t_algo_client.accept_manager()
+        self.assertEqual(e.exception.source["line"], 'assert(Txn.Sender == proposed_manager)')
+
+         # Accept from the proposed address
+        self.t_algo_client.user_address = address1
+        self.t_algo_client.accept_manager()
+        self.assertEqual(self.t_algo_client.get_global(b"proposed_manager"), None)
+        self.assertEqual(self.t_algo_client.get_global(b"manager"), decode_address(address1))
+
+        # Try to accept again from the proposed address
+        with self.assertRaises(LogicEvalError) as e:
+            self.t_algo_client.accept_manager()
+        self.assertEqual(e.exception.source["line"], 'assert(Txn.Sender == proposed_manager)')
