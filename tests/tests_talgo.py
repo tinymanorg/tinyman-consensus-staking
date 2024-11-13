@@ -30,8 +30,8 @@ APP_GLOBAL_INTS = 16
 APP_GLOBAL_BYTES = 16
 EXTRA_PAGES = 1
 
-talgo_approval_program = TealishProgram('contracts/talgo/talgo.tl')
-talgo_clear_state_program = TealishProgram('contracts/talgo/clear_state.tl')
+talgo_approval_program = TealishProgram('contracts/talgo/talgo_approval.tl')
+talgo_clear_state_program = TealishProgram('contracts/talgo/talgo_clear_state.tl')
 
 RATE_SCALER = int(1e12)
 
