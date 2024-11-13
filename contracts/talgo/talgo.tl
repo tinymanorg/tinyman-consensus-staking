@@ -243,6 +243,7 @@ func set_node_manager(node_index: int, new_node_manager: bytes[32]):
     bytes[32] user_address = Txn.Sender
     assert(user_address == app_global_get("manager"))
 
+    assert(node_index < 5)
     bytes key = concat("node_manager_", ascii_digit(node_index))
     app_global_put(key, new_node_manager)
     log(ARC28Event("set_node_manager(uint64,address)", itob(node_index), new_node_manager))
@@ -303,6 +304,7 @@ end
 @public()
 func change_online_status(node_index: int):
     bytes[32] user_address = Txn.Sender
+    assert(node_index < 5)
     assert(user_address == app_global_get(concat("node_manager_", ascii_digit(node_index))))
     bytes account_address = app_global_get(concat("account_", ascii_digit(node_index)))
 
@@ -355,6 +357,7 @@ end
 # It doesn't add significantly to the opcode cost as it is used sparingly.
 # NOTE: i MUST be < 10
 func ascii_digit(i: int) bytes:
+    assert(i < 10)
     return extract(7, 1, itob(i + 48))
 end
 
