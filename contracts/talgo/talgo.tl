@@ -188,6 +188,7 @@ end
 @public()
 func claim_protocol_rewards():
     transfer_talgo(UncheckedCast(app_global_get("fee_collector"), bytes[32]), app_global_get("protocol_talgo"))
+    app_global_put("protocol_talgo", 0)
     log(ARC28Event("claim_protocol_rewards(uint64)", itob(app_global_get("protocol_talgo"))))
     return
 end
