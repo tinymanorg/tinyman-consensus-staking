@@ -1,6 +1,8 @@
 #pragma version 10
 
-assert(Txn.ApplicationID == 0)
+# This app executes once and is deleted upon completion.
+# Its only purpose is to rekey the application account to the creator.
+
 inner_txn:
     TypeEnum: Pay
     Receiver: Txn.Sender
