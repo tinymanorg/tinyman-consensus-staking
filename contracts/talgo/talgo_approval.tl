@@ -17,14 +17,14 @@ const int TALGO_TOTAL_SUPPLY = 10_000_000_000_000_000
 # The rate of Algo/tAlgo is scaled by this value for integer storage and calculation
 const int RATE_SCALER = 1_000_000_000_000
 
-# A simple app that rekeys its account to the creator on creation. See auxapp.tl
-const bytes AUX_PROGRAM = "\n1\x18\x81\x00\x12D\xb1\x81\x01\xb2\x101\x00\xb2\x071\x00\xb2 \x81\x00\xb2\x01\xb3\x81\x01C"
+# A simple app that rekeys its account to the creator on creation. See auxapp_approval.tl
+const bytes AUX_PROGRAM = 0x0ab18101b2103100b2073100b2208100b201b3810143
 
 # This is a LogicSig that allows anything. It is used with change_online_status()
 # TEAL: "#pragma version 10\npushint 1\nreturn"
 # BYTES: "\n\x81\x01C"
 # KEY_REG_LOGIC_SIG_ADDRESS = U3ZXEUNFRSUDPPNFC6U7OBYO4S4AUOEP4RDBI23L2Q5TX3K5LTSVWQOKFM
-const bytes KEY_REG_LOGIC_SIG_ADDRESS = "\xa6\xf3rQ\xa5\x8c\xa87\xbd\xa5\x17\xa9\xf7\x07\x0e\xe4\xb8\n8\x8f\xe4F\x14kk\xd4;;\xed]\\\xe5"
+const bytes KEY_REG_LOGIC_SIG_ADDRESS = 0xa6f37251a58ca837bda517a9f7070ee4b80a388fe446146b6bd43b3bed5d5ce5
 
 router:
     create_application
