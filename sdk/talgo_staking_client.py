@@ -41,6 +41,7 @@ class TAlgoStakingClient(BaseClient):
                 sp=sp,
                 index=self.app_id,
                 app_args=["set_reward_rate", total_reward_amount, end_timestamp],
+                foreign_assets=[self.tiny_asset_id]
             )
         ]
 

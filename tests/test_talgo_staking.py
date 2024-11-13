@@ -76,7 +76,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
                 TINY_POWER_THRESHOLD_KEY: 500_000_000,
                 CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
-                LAST_REWARD_RATE_PER_TIME_KEY: 0
+                TOTAL_CLAIMED_REWARD_AMOUNT_KEY: 0
             }
         )
 
@@ -122,7 +122,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
                 TINY_POWER_THRESHOLD_KEY: 500_000_000,
                 CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
-                LAST_REWARD_RATE_PER_TIME_KEY: 0
+                TOTAL_CLAIMED_REWARD_AMOUNT_KEY: 0
             }
         )
 
@@ -135,7 +135,23 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
 
         start_timestamp = int(datetime(2025, 3, 24, tzinfo=timezone.utc).timestamp())
         end_timestamp = start_timestamp + WEEK
+        self.ledger.set_account_balance(self.application_address, 1_000_000, self.tiny_asset_id)
         client_for_manager.set_reward_rate(1_000_000, end_timestamp)
+
+    def test_set_reward_rate_fail(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+
+        start_timestamp = int(datetime(2025, 3, 24, tzinfo=timezone.utc).timestamp())
+        end_timestamp = start_timestamp + WEEK
+        self.ledger.set_account_balance(self.application_address, 999_999, self.tiny_asset_id)
+
+        with self.assertRaises(LogicEvalError) as e:
+            client_for_manager.set_reward_rate(1_000_000, end_timestamp)
+        self.assertEqual(e.exception.source['line'], 'assert(tiny_balance >= balance_needed)')
 
     def test_set_tiny_power_threshold(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -195,7 +211,6 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
         global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
         self.assertEqual(global_state.last_update_timestamp, now + WEEK)
         self.assertEqual(global_state.current_reward_rate_per_time, 0)
-        self.assertEqual(global_state.last_reward_rate_per_time, old_global_state.current_reward_rate_per_time)
 
     def test_increase_stake(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -261,6 +276,240 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
 
         user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")
         self.assertEqual(user_state.accumulated_rewards, 0)
+
+
+class ManagerMethodsTests(TalgoStakingBaseTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+    def setUp(self):
+        super().setUp()
+        self.ledger.set_account_balance(self.user_address, int(1e16))
+
+    def test_set_reward_rate_initial(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+
+        start_timestamp = now + DAY
+        end_timestamp = start_timestamp + WEEK
+        reward_rate_per_time = 1_000_000 // WEEK
+
+        self.ledger.next_timestamp = start_timestamp
+        self.ledger.set_account_balance(self.application_address, 1_000_000, self.tiny_asset_id)
+        client_for_manager.set_reward_rate(1_000_000, end_timestamp)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.total_claimed_reward_amount, 0)
+        self.assertEqual(current_global_state.total_reward_amount_sum, 1_000_000)
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, 0)
+        self.assertEqual(current_global_state.last_update_timestamp, now + DAY)
+        self.assertEqual(current_global_state.total_staked_amount, 0)
+        self.assertEqual(current_global_state.total_staker_count, 0)
+
+    def test_set_reward_rate_subsequent_with_claim(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+
+        # Set Reward Rate
+        start_timestamp = now + DAY
+        end_timestamp = start_timestamp + WEEK
+        total_reward_amount = 100_000_000
+        reward_rate_per_time = total_reward_amount // WEEK
+
+        self.ledger.next_timestamp = start_timestamp
+        self.ledger.set_account_balance(self.application_address, total_reward_amount, self.tiny_asset_id)
+        client_for_manager.set_reward_rate(total_reward_amount, end_timestamp)
+
+        old_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+
+        # Increase Stake
+        self.simulate_user_voting_power()
+        self.ledger.next_timestamp = now + DAY + 1
+        self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
+        self.talgo_staking_client.increase_stake(100_000)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.total_claimed_reward_amount, 0)
+        self.assertEqual(current_global_state.total_reward_amount_sum, total_reward_amount)
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, 0)
+        self.assertEqual(current_global_state.last_update_timestamp, now + DAY + 1)
+        self.assertEqual(current_global_state.total_staked_amount, 100_000)
+        self.assertEqual(current_global_state.total_staker_count, 1)
+
+        old_global_state = current_global_state
+
+        # Claim Rewards
+        user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")
+        accumulated_rewards = get_accumulated_rewards(user_state, old_global_state, current_timestamp=now + 2 * DAY)
+        self.ledger.next_timestamp = now + 2 * DAY
+        self.talgo_staking_client.claim_rewards()
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, old_global_state.get_accumulated_rewards_per_unit(now + 2 * DAY))
+        self.assertEqual(current_global_state.last_update_timestamp, now + 2 * DAY)
+        self.assertEqual(current_global_state.total_reward_amount_sum, total_reward_amount)
+        self.assertEqual(current_global_state.total_claimed_reward_amount, accumulated_rewards)
+        self.assertEqual(current_global_state.total_staked_amount, 100_000)
+        self.assertEqual(current_global_state.total_staker_count, 1)
+
+        old_global_state = current_global_state
+
+        # Set Reward Rate Again, in same block with claim_rewards.
+        # Lower the rate. Use the remaining amount for 2 WEEK.
+        undistributed_amount = reward_rate_per_time * (end_timestamp - (now + 2 * DAY))
+        reward_rate_per_time = undistributed_amount // (2 * WEEK)
+        start_timestamp = now + 2 * DAY
+        end_timestamp = start_timestamp + 2 * WEEK
+        self.ledger.next_timestamp = now + 2 * DAY
+        client_for_manager.set_reward_rate(undistributed_amount, end_timestamp)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, old_global_state.accumulated_rewards_per_unit)
+        self.assertEqual(current_global_state.last_update_timestamp, now + 2 * DAY)
+        self.assertEqual(current_global_state.total_claimed_reward_amount, accumulated_rewards)
+        self.assertEqual(current_global_state.total_reward_amount_sum, total_reward_amount)
+        self.assertEqual(current_global_state.total_staked_amount, 100_000)
+        self.assertEqual(current_global_state.total_staker_count, 1)
+
+    def test_set_reward_rate_subsequent_without_claim(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+
+        # Set Reward Rate
+        start_timestamp = now + DAY
+        end_timestamp = start_timestamp + WEEK
+        total_reward_amount = 100_000_000
+        reward_rate_per_time = total_reward_amount // WEEK
+
+        self.ledger.next_timestamp = start_timestamp
+        self.ledger.set_account_balance(self.application_address, total_reward_amount, self.tiny_asset_id)
+        client_for_manager.set_reward_rate(total_reward_amount, end_timestamp)
+
+        old_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+
+        # Increase Stake
+        self.simulate_user_voting_power()
+        self.ledger.next_timestamp = now + DAY + 1
+        self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
+        self.talgo_staking_client.increase_stake(100_000)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, 0)
+        self.assertEqual(current_global_state.last_update_timestamp, now + DAY + 1)
+        self.assertEqual(current_global_state.total_claimed_reward_amount, 0)
+        self.assertEqual(current_global_state.total_reward_amount_sum, total_reward_amount)
+        self.assertEqual(current_global_state.total_staked_amount, 100_000)
+        self.assertEqual(current_global_state.total_staker_count, 1)
+
+        old_global_state = current_global_state
+
+        # Set Reward Rate Again
+        # Lower the rate. Use the remaining amount for 2 WEEK.
+        undistributed_amount = reward_rate_per_time * (end_timestamp - (now + 2 * DAY))
+        reward_rate_per_time = undistributed_amount // (2 * WEEK)
+        start_timestamp = now + 2 * DAY
+        end_timestamp = start_timestamp + 2 * WEEK
+        self.ledger.next_timestamp = now + 2 * DAY
+        client_for_manager.set_reward_rate(undistributed_amount, end_timestamp)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.total_claimed_reward_amount, 0)
+        self.assertEqual(current_global_state.total_reward_amount_sum, total_reward_amount)
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, old_global_state.get_accumulated_rewards_per_unit(now + 2 * DAY))
+        self.assertEqual(current_global_state.last_update_timestamp, now + 2 * DAY)
+        self.assertEqual(current_global_state.total_staked_amount, 100_000)
+        self.assertEqual(current_global_state.total_staker_count, 1)
+
+    def test_set_reward_rate_to_higher(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+
+        # Set Reward Rate
+        start_timestamp = now + DAY
+        end_timestamp = start_timestamp + WEEK
+        total_reward_amount = 100_000_000
+        reward_rate_per_time = total_reward_amount // WEEK
+
+        self.ledger.next_timestamp = start_timestamp
+        self.ledger.set_account_balance(self.application_address, total_reward_amount, self.tiny_asset_id)
+        client_for_manager.set_reward_rate(total_reward_amount, end_timestamp)
+
+        old_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+
+        # Increase Stake
+        self.simulate_user_voting_power()
+        self.ledger.next_timestamp = now + DAY + 1
+        self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
+        self.talgo_staking_client.increase_stake(100_000)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.total_claimed_reward_amount, 0)
+        self.assertEqual(current_global_state.total_reward_amount_sum, total_reward_amount)
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, 0)
+        self.assertEqual(current_global_state.last_update_timestamp, now + DAY + 1)
+        self.assertEqual(current_global_state.total_staked_amount, 100_000)
+        self.assertEqual(current_global_state.total_staker_count, 1)
+
+        old_global_state = current_global_state
+
+        # Claim Rewards
+        user_state = self.talgo_staking_client.get_box(self.talgo_staking_client.get_user_state_box_name(self.user_address), "UserState")
+        accumulated_rewards = get_accumulated_rewards(user_state, old_global_state, current_timestamp=now + 2 * DAY)
+        self.ledger.next_timestamp = now + 2 * DAY
+        self.talgo_staking_client.claim_rewards()
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, old_global_state.get_accumulated_rewards_per_unit(now + 2 * DAY))
+        self.assertEqual(current_global_state.last_update_timestamp, now + 2 * DAY)
+        self.assertEqual(current_global_state.total_reward_amount_sum, total_reward_amount)
+        self.assertEqual(current_global_state.total_claimed_reward_amount, accumulated_rewards)
+        self.assertEqual(current_global_state.total_staked_amount, 100_000)
+        self.assertEqual(current_global_state.total_staker_count, 1)
+
+        old_global_state = current_global_state
+
+        # Set Reward Rate Again, in same block with claim_rewards.
+        # Increase the rate. Use the remaining amount for a DAY.
+        undistributed_amount = reward_rate_per_time * (end_timestamp - (now + 2 * DAY))
+        reward_rate_per_time = undistributed_amount // DAY
+        start_timestamp = now + 2 * DAY
+        end_timestamp = start_timestamp + DAY
+        self.ledger.next_timestamp = now + 2 * DAY
+        client_for_manager.set_reward_rate(undistributed_amount, end_timestamp)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
+        self.assertEqual(current_global_state.accumulated_rewards_per_unit, old_global_state.accumulated_rewards_per_unit)
+        self.assertEqual(current_global_state.last_update_timestamp, now + 2 * DAY)
+        self.assertEqual(current_global_state.total_claimed_reward_amount, accumulated_rewards)
+        self.assertEqual(current_global_state.total_reward_amount_sum, total_reward_amount)
+        self.assertEqual(current_global_state.total_staked_amount, 100_000)
+        self.assertEqual(current_global_state.total_staker_count, 1)
 
 
 class UpdateStateTests(TalgoStakingBaseTestCase):
@@ -1026,6 +1275,7 @@ class ClaimRewardsTests(TalgoStakingBaseTestCase):
         self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
         self.assertEqual(current_global_state.accumulated_rewards_per_unit, old_global_state.get_accumulated_rewards_per_unit(now + DAY + 1))
         self.assertEqual(current_global_state.last_update_timestamp, now + DAY + 1)
+        self.assertEqual(current_global_state.total_claimed_reward_amount, accumulated_rewards)
         self.assertEqual(current_global_state.total_staked_amount, 100_000)
         self.assertEqual(current_global_state.total_staker_count, 1)
 
@@ -1107,6 +1357,7 @@ class ClaimRewardsTests(TalgoStakingBaseTestCase):
         self.assertEqual(current_global_state.current_reward_rate_per_time, reward_rate_per_time)
         self.assertEqual(current_global_state.accumulated_rewards_per_unit, old_global_state.accumulated_rewards_per_unit)
         self.assertEqual(current_global_state.accumulated_rewards_per_unit, 0)
+        self.assertEqual(current_global_state.total_claimed_reward_amount, 0)
         self.assertEqual(current_global_state.last_update_timestamp, now + DAY)
         self.assertEqual(current_global_state.total_staked_amount, 100_000)
         self.assertEqual(current_global_state.total_staker_count, 1)

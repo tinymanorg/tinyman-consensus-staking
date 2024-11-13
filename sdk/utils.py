@@ -6,7 +6,8 @@ from sdk.constants import *
 
 @dataclass
 class TAlgoStakingAppGlobalState:
-    last_reward_rate_per_time: int
+    total_reward_amount_sum: int
+    total_claimed_reward_amount: int
     current_reward_rate_per_time: int
     current_reward_rate_per_time_end_timestamp: int
     accumulated_rewards_per_unit: int
@@ -19,7 +20,8 @@ class TAlgoStakingAppGlobalState:
     @classmethod
     def from_globalstate(cls, global_state: dict):
         return cls(
-            last_reward_rate_per_time=global_state.get(LAST_REWARD_RATE_PER_TIME_KEY, 0),
+            total_reward_amount_sum=global_state.get(TOTAL_REWARD_AMOUNT_SUM_KEY, 0),
+            total_claimed_reward_amount=global_state.get(TOTAL_CLAIMED_REWARD_AMOUNT_KEY, 0),
             current_reward_rate_per_time=global_state.get(CURRENT_REWARD_RATE_PER_TIME_KEY, 0),
             current_reward_rate_per_time_end_timestamp=global_state.get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, 0),
             accumulated_rewards_per_unit=global_state.get(ACCUMULATED_REWARDS_PER_UNIT, 0),
@@ -31,7 +33,8 @@ class TAlgoStakingAppGlobalState:
 
     def to_globalstate(self) -> dict:
         return {
-            LAST_REWARD_RATE_PER_TIME_KEY: self.last_reward_rate_per_time,
+            TOTAL_REWARD_AMOUNT_SUM_KEY: self.total_reward_amount_sum,
+            TOTAL_CLAIMED_REWARD_AMOUNT_KEY: self.total_claimed_reward_amount,
             CURRENT_REWARD_RATE_PER_TIME_KEY: self.current_reward_rate_per_time,
             CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: self.current_reward_rate_per_time_end_timestamp,
             ACCUMULATED_REWARDS_PER_UNIT: self.accumulated_rewards_per_unit,

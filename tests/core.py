@@ -93,7 +93,7 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
                 VAULT_APP_ID_KEY: self.vault_app_id,
                 MANAGER_KEY: decode_address(self.manager_address),
                 TINY_POWER_THRESHOLD_KEY: 500_000_000,
-                LAST_REWARD_RATE_PER_TIME_KEY: 0,
+                TOTAL_CLAIMED_REWARD_AMOUNT_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
             }
@@ -151,10 +151,23 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
         duration = int(end_timestamp - start_timestamp)
         reward_rate_per_time = int(total_reward_amount / duration)
 
-        self.ledger.global_states[self.app_id][LAST_REWARD_RATE_PER_TIME_KEY] = self.ledger.global_states[self.app_id].get(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+        total_reward_amount_sum = self.ledger.global_states[self.app_id].get(TOTAL_REWARD_AMOUNT_SUM_KEY, 0)
+        total_claimed_reward_amount = self.ledger.global_states[self.app_id].get(TOTAL_CLAIMED_REWARD_AMOUNT_KEY, 0)
+        current_reward_rate_per_time_end_timestamp = self.ledger.global_states[self.app_id].get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
+
+        if start_timestamp < current_reward_rate_per_time_end_timestamp:
+            current_reward_rate_per_time = self.ledger.global_states[self.app_id].get(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+            remaining_from_current_rate = current_reward_rate_per_time * (current_reward_rate_per_time_end_timestamp - start_timestamp)
+
+            total_reward_amount_sum -= remaining_from_current_rate
+
+        total_reward_amount_sum += total_reward_amount
+        balance_needed = total_reward_amount_sum - total_claimed_reward_amount
+
+        self.ledger.global_states[self.app_id][TOTAL_REWARD_AMOUNT_SUM_KEY] = total_reward_amount_sum
         self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_KEY] = reward_rate_per_time
         self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY] = end_timestamp
-        self.ledger.set_account_balance(self.application_address, total_reward_amount, self.tiny_asset_id)
+        self.ledger.set_account_balance(self.application_address, balance_needed + 1, self.tiny_asset_id)
 
         return reward_rate_per_time, end_timestamp
 
