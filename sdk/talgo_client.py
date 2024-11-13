@@ -201,6 +201,38 @@ class TAlgoClient(BaseClient):
         ]
         return self._submit(transactions, additional_fees=0)
     
+    def set_protocol_fee(self, fee_amount):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["set_protocol_fee", fee_amount],
+                accounts=[
+                ],
+                foreign_assets=[]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=0)
+    
+    def set_max_account_balance(self, max_amount):
+        sp = self.get_suggested_params()
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["set_max_account_balance", max_amount],
+                accounts=[
+                ],
+                foreign_assets=[]
+            ),
+        ]
+        return self._submit(transactions, additional_fees=0)
+    
     def propose_manager(self, new_manager):
         sp = self.get_suggested_params()
         transactions = [

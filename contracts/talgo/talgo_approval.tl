@@ -283,7 +283,7 @@ func set_protocol_fee(fee_amount: int):
 
     assert(fee_amount <= 100)
     app_global_put("protocol_fee", fee_amount)
-    log(ARC28Event("set_protocol_fee(uint64)", fee_amount))
+    log(ARC28Event("set_protocol_fee(uint64)", itob(fee_amount)))
     return
 end
 
@@ -295,7 +295,7 @@ func set_max_account_balance(max_amount: int):
     assert(user_address == app_global_get("manager"))
 
     app_global_put("max_account_balance", max_amount)
-    log(ARC28Event("set_max_account_balance(uint64)", max_amount))
+    log(ARC28Event("set_max_account_balance(uint64)", itob(max_amount)))
     return
 end
 

@@ -503,3 +503,15 @@ class TestSetup(unittest.TestCase):
         with self.assertRaises(LogicEvalError) as e:
             self.t_algo_client.accept_manager()
         self.assertEqual(e.exception.source["line"], 'assert(Txn.Sender == proposed_manager)')
+
+    def test_set_protocol_fee(self):
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+        self.t_algo_client.init()
+        self.t_algo_client.set_protocol_fee(20)
+        self.assertEqual(self.t_algo_client.get_global(b"protocol_fee"), 20)
+
+    def test_set_max_account_balance(self):
+        self.ledger.update_global_state(self.app_id, {"manager": decode_address(self.user_address)})
+        self.t_algo_client.init()
+        self.t_algo_client.set_max_account_balance(int(10e12))
+        self.assertEqual(self.t_algo_client.get_global(b"max_account_balance"), int(10e12))

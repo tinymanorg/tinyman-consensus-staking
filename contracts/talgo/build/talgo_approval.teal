@@ -732,9 +732,10 @@ __func__set_protocol_fee:
     pushbytes "protocol_fee"
     load 17                                                 // fee_amount
     app_global_put
-    // tl:286: log(ARC28Event("set_protocol_fee(uint64)", fee_amount))
+    // tl:286: log(ARC28Event("set_protocol_fee(uint64)", itob(fee_amount)))
     pushbytes 0x6285c48b                                    // SHA512_256("set_protocol_fee(uint64)")[:4]
     load 17                                                 // fee_amount
+    itob
     concat
     log
     // tl:287: return
@@ -759,9 +760,10 @@ __func__set_max_account_balance:
     pushbytes "max_account_balance"
     load 19                                                 // max_amount
     app_global_put
-    // tl:298: log(ARC28Event("set_max_account_balance(uint64)", max_amount))
+    // tl:298: log(ARC28Event("set_max_account_balance(uint64)", itob(max_amount)))
     pushbytes 0x3a6a3444                                    // SHA512_256("set_max_account_balance(uint64)")[:4]
     load 19                                                 // max_amount
+    itob
     concat
     log
     // tl:299: return
