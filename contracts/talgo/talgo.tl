@@ -35,7 +35,8 @@ router:
     sync
     claim_protocol_rewards
     move_stake
-    set_manager
+    propose_manager
+    accept_manager
     set_node_manager
     set_stake_manager
     set_fee_collector
@@ -49,10 +50,11 @@ end
 
 # permission: anyone
 @public(OnCompletion=CreateApplication)
-func create_application(manager_address: bytes[32]):
+func create_application():
     # Set initial values for all configurable roles and settings
 
     # The manager has permission to change other manager roles and set the protocol fee
+    bytes manager_address = Txn.Sender
     app_global_put("manager", manager_address)
 
     # The node manager for each account has permission to bring the account online/offline with Keyreg
@@ -207,13 +209,29 @@ func sync():
 end
 
 
+# The current manager can propose a new manager. The manager will not be changed until the proposed manager calls accept_manager.
+# The current manager can propose multiple times, overwriting the previous proposal.
 # permission: manager
 @public()
-func set_manager(new_manager: bytes[32]):
+func propose_manager(new_manager: bytes[32]):
     assert(Txn.Sender == app_global_get("manager"))
 
-    app_global_put("manager", new_manager)
-    log(ARC28Event("set_manager(address)", new_manager))
+    app_global_put("proposed_manager", new_manager)
+    log(ARC28Event("propose_manager(address)", new_manager))
+    return
+end
+
+
+# The proposed manager must call this function to become the manager.
+# permission: proposed_manager
+@public()
+func accept_manager():
+    bytes proposed_manager = app_global_get("proposed_manager")
+    assert(Txn.Sender == proposed_manager)
+
+    app_global_put("manager", proposed_manager)
+    app_global_put("proposed_manager", "")
+    log(ARC28Event("accept_manager(address)", proposed_manager))
     return
 end
 
