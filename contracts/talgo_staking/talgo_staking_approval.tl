@@ -147,6 +147,7 @@ func set_reward_rate(total_reward_amount: int, end_timestamp: int):
 
     int duration = end_timestamp - Global.LatestTimestamp
     int reward_rate_per_time = total_reward_amount / duration
+    assert(reward_rate_per_time <= 18446744073)
 
     # Calculate the needed balance.
     int total_reward_amount_sum = app_global_get(TOTAL_REWARD_AMOUNT_SUM_KEY)
@@ -260,6 +261,7 @@ func update_state_internal(timestamp: int):
         int time_delta = timestamp - last_update_timestamp
 
         # This would overflow if reward_rate_per_time > 18446744073 microunit.
+        # This is asserted in set_reward_rate.
         int reward_rate_per_unit_per_time = (reward_rate_per_time * RPU_SCALER) / total_staked_amount
         accumulated_rewards_per_unit = accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
 

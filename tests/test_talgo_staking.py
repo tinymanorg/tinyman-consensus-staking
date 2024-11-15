@@ -511,6 +511,33 @@ class ManagerMethodsTests(TalgoStakingBaseTestCase):
         self.assertEqual(current_global_state.total_staked_amount, 100_000)
         self.assertEqual(current_global_state.total_staker_count, 1)
 
+    def test_set_reward_rate_fail_on_overflow_check(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+
+        # Increase Stake
+        self.simulate_user_voting_power()
+        self.ledger.next_timestamp = now + DAY
+        self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
+        self.talgo_staking_client.increase_stake(100_000)
+
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+
+        # Set Reward Rate
+        start_timestamp = now + DAY
+        end_timestamp = start_timestamp + 100
+        total_reward_amount = (18446744073 + 1) * 100
+        reward_rate_per_time = total_reward_amount // 100
+
+        self.ledger.next_timestamp = start_timestamp
+        self.ledger.set_account_balance(self.application_address, total_reward_amount, self.tiny_asset_id)
+        with self.assertRaises(LogicEvalError) as e:
+            client_for_manager.set_reward_rate(total_reward_amount, end_timestamp)
+        self.assertEqual(e.exception.source['line'], 'assert(reward_rate_per_time <= 18446744073)')
+
 
 class UpdateStateTests(TalgoStakingBaseTestCase):
     @classmethod
