@@ -27,7 +27,7 @@ create_application_event = Event(
 
 
 init_event = Event(
-    name="event",
+    name="init",
     args=[
         abi.Argument(arg_type="uint64", name="stalgo_asset_id")
     ]
@@ -138,8 +138,101 @@ burn_event = Event(
 )
 
 
+claim_protocol_rewards_event = Event(
+    name="claim_protocol_rewards",
+    args=[
+        abi.Argument(arg_type="uint64", name="amount")
+    ]
+)
+
+
+move_stake_event = Event(
+    name="move_stake",
+    args=[
+        abi.Argument(arg_type="uint64", name="from_index"),
+        abi.Argument(arg_type="uint64", name="to_index"),
+        abi.Argument(arg_type="uint64", name="amount")
+    ]
+)
+
+
+propose_manager_event = Event(
+    name="propose_manager",
+    args=[
+        abi.Argument(arg_type="address", name="proposed_manager")
+    ]
+)
+
+
+accept_manager_event = Event(
+    name="accept_manager",
+    args=[
+        abi.Argument(arg_type="address", name="new_manager")
+    ]
+)
+
+
+set_node_manager_event = Event(
+    name="set_node_manager",
+    args=[
+        abi.Argument(arg_type="uint64", name="node_index"),
+        abi.Argument(arg_type="address", name="new_node_manager")
+    ]
+)
+
+
+set_stake_manager_event = Event(
+    name="set_stake_manager",
+    args=[
+        abi.Argument(arg_type="address", name="new_stake_manager")
+    ]
+)
+
+
+set_fee_collector_event = Event(
+    name="set_fee_collector",
+    args=[
+        abi.Argument(arg_type="address", name="new_fee_collector")
+    ]
+)
+
+
+set_protocol_fee_event = Event(
+    name="set_protocol_fee",
+    args=[
+        abi.Argument(arg_type="uint64", name="fee_rate")
+    ]
+)
+
+
+set_max_account_balance_event = Event(
+    name="set_max_account_balance",
+    args=[
+        abi.Argument(arg_type="uint64", name="max_amount")
+    ]
+)
+
+
+change_online_status_event = Event(
+    name="change_online_status",
+    args=[
+        abi.Argument(arg_type="uint64", name="node_index")
+    ]
+)
+
+
 talgo_events = [
     rate_update_event,
     mint_event,
     burn_event,
+    claim_protocol_rewards_event,
+    move_stake_event,
+    propose_manager_event,
+    accept_manager_event,
+    set_node_manager_event,
+    set_stake_manager_event,
+    set_fee_collector_event,
+    set_protocol_fee_event,
+    set_max_account_balance_event,
+    change_online_status_event,
 ]
