@@ -47,6 +47,51 @@ class TAlgoStakingClient(BaseClient):
 
         return self._submit(transactions)
 
+    def propose_manager(self, new_manager_address):
+        sp = self.get_suggested_params()
+
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["propose_manager", decode_address(new_manager_address)],
+            )
+        ]
+
+        return self._submit(transactions)
+
+    def accept_manager(self):
+        sp = self.get_suggested_params()
+
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["accept_manager"],
+            )
+        ]
+
+        return self._submit(transactions)
+
+    def set_tiny_power_threshold(self, threshold: int):
+        sp = self.get_suggested_params()
+
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["set_tiny_power_threshold", threshold],
+            )
+        ]
+
+        return self._submit(transactions)
+
     def get_apply_rate_change_txn(self):
         sp = self.get_suggested_params()
 

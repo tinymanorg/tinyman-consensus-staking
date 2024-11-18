@@ -1,19 +1,12 @@
-from base64 import b64decode
 from datetime import datetime, timezone
-import time
-import uuid
-from unittest.mock import ANY
 
-from algojig import print_logs
 from algojig.exceptions import LogicEvalError
-from algojig.ledger import JigLedger
 from algosdk import transaction
 from algosdk.account import generate_account
 from algosdk.encoding import decode_address, encode_address
-from algosdk.logic import get_application_address
 from algosdk.transaction import OnComplete
 
-from tinyman.utils import bytes_to_int, int_to_bytes, TransactionGroup, get_global_state
+from tinyman.utils import TransactionGroup
 
 from sdk.constants import *
 from sdk.talgo_staking_client import TAlgoStakingClient
@@ -159,6 +152,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
         self.init_talgo_staking_app()
 
         client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+        client_for_manager.set_tiny_power_threshold(2000_000_000)
 
     def test_update_state(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -170,10 +164,6 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
 
         self.ledger.next_timestamp = now + WEEK
         self.talgo_staking_client.update_state()
-        block = self.ledger.last_block
-        block_txns = block[b"txns"]
-
-        update_state_txn = block_txns[0]
 
     def test_update_state_fail_passed_expiration(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -537,6 +527,95 @@ class ManagerMethodsTests(TalgoStakingBaseTestCase):
         with self.assertRaises(LogicEvalError) as e:
             client_for_manager.set_reward_rate(total_reward_amount, end_timestamp)
         self.assertEqual(e.exception.source['line'], 'assert(reward_rate_per_time <= 18446744073)')
+
+    def test_propose_and_accept_manager(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+        user_1_client = self.get_new_user_client()
+
+        self.ledger.next_timestamp = now
+        client_for_manager.propose_manager(user_1_client.user_address)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.manager, self.manager_address)
+        self.assertEqual(current_global_state.proposed_manager, user_1_client.user_address)
+
+        self.ledger.next_timestamp = now
+        user_1_client.accept_manager()
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.manager, user_1_client.user_address)
+        self.assertEqual(current_global_state.proposed_manager, None)
+
+    def test_propose_and_accept_manager(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+        user_1_client = self.get_new_user_client()
+        user_2_client = self.get_new_user_client()
+
+        self.ledger.next_timestamp = now
+        client_for_manager.propose_manager(user_1_client.user_address)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.manager, self.manager_address)
+        self.assertEqual(current_global_state.proposed_manager, user_1_client.user_address)
+
+        self.ledger.next_timestamp = now
+        with self.assertRaises(LogicEvalError) as e:
+            user_2_client.accept_manager()
+        self.assertEqual(e.exception.source['line'], 'assert(Txn.Sender == proposed_manager)')
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.manager, self.manager_address)
+        self.assertEqual(current_global_state.proposed_manager, user_1_client.user_address)
+
+    def test_accept_manager_without_propose(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        user_1_client = self.get_new_user_client()
+
+        self.ledger.next_timestamp = now
+        with self.assertRaises(LogicEvalError) as e:
+            user_1_client.accept_manager()
+        self.assertEqual(e.exception.source['line'], 'assert(Txn.Sender == proposed_manager)')
+
+    def test_set_tiny_power_threshold(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        client_for_manager = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.manager_address, self.manager_sk)
+
+        self.ledger.next_timestamp = now
+        client_for_manager.set_tiny_power_threshold(2000_000_000)
+
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        self.assertEqual(current_global_state.tiny_power_threshold, 2000_000_000)
+    
+    def test_set_tiny_power_threshold_without_manager(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        user_1_client = self.get_new_user_client()
+
+        self.ledger.next_timestamp = now
+        with self.assertRaises(LogicEvalError) as e:
+            user_1_client.set_tiny_power_threshold(2000_000_000)
+        self.assertEqual(e.exception.source['line'], 'assert(Txn.Sender == app_global_get(MANAGER_KEY))')
 
 
 class UpdateStateTests(TalgoStakingBaseTestCase):

@@ -23,4 +23,5 @@ ACCUMULATED_REWARDS_PER_UNIT = b"accumulated_rewards_per_unit"
 TOTAL_STAKED_AMOUNT_KEY = b"total_staked_amount"
 TOTAL_STAKER_COUNT_KEY = b"total_staker_count"
 
+PROPOSED_MANAGER_KEY = b"proposed_manager"
 MANAGER_KEY = b"manager"

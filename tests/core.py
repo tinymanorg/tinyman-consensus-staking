@@ -43,14 +43,14 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
         self.ledger.set_account_balance(self.tiny_asset_creator_address, 10_000_000)
 
         # Set up Vault
-        self.tiny_asset_id = 12345
+        self.tiny_asset_id = 1003
         self.ledger.create_asset(self.tiny_asset_id, dict(total=10**15, decimals=6, name="Tinyman", unit_name="TINY", creator=self.tiny_asset_creator_address))
         self.ledger.create_app(app_id=self.vault_app_id, approval_program=vault_approval_program, creator=self.app_creator_address, local_ints=0, local_bytes=0, global_ints=4, global_bytes=0)
         self.ledger.set_global_state(self.vault_app_id, {"tiny_asset_id": self.tiny_asset_id, "total_locked_amount": 0, "total_power_count": 0, "last_total_power_timestamp": 0})
         self.ledger.set_account_balance(get_application_address(self.vault_app_id), 300_000)
         self.ledger.boxes[self.vault_app_id] = {}
 
-        self.talgo_asset_id = 78910
+        self.talgo_asset_id = 1004
         self.ledger.create_asset(self.talgo_asset_id, 
             {
                 "creator": self.tiny_asset_creator_address,
@@ -69,7 +69,7 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
 
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
         self.application_address = get_application_address(self.app_id)
-        self.stalgo_asset_id = 1112131
+        self.stalgo_asset_id = 1005
 
         self.algod = JigAlgod(self.ledger)
         self.talgo_staking_client = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.user_address, self.user_sk)

@@ -29,6 +29,7 @@ const bytes LAST_UPDATE_TIMESTAMP_KEY = "last_update_timestamp"
 const bytes TOTAL_STAKED_AMOUNT_KEY = "total_staked_amount"
 const bytes TOTAL_STAKER_COUNT_KEY = "total_staker_count"
 
+const bytes PROPOSED_MANAGER_KEY = "proposed_manager"
 const bytes MANAGER_KEY = "manager"
 
 const int RPU_SCALER = 1000000000
@@ -40,7 +41,8 @@ router:
     create_application
     update_application
     init
-    set_manager
+    propose_manager
+    accept_manager
     set_tiny_power_threshold
     set_reward_rate
     apply_rate_change
@@ -110,14 +112,27 @@ func init():
 end
 
 
-# Permission: manager
+# permission: manager
 @public()
-func set_manager(new_manager: bytes[32]):
-    bytes[32] user_address = Txn.Sender
-    assert(user_address == app_global_get(MANAGER_KEY))
+func propose_manager(new_manager: bytes[32]):
+    assert(Txn.Sender == app_global_get(MANAGER_KEY))
 
-    app_global_put(MANAGER_KEY, new_manager)
-    log(ARC28Event("set_manager(address)", new_manager))
+    app_global_put(PROPOSED_MANAGER_KEY, new_manager)
+    log(ARC28Event("propose_manager(address)", new_manager))
+    return
+end
+
+
+# The proposed manager must call this function to become the manager.
+# permission: proposed_manager
+@public()
+func accept_manager():
+    bytes proposed_manager = app_global_get(PROPOSED_MANAGER_KEY)
+    assert(Txn.Sender == proposed_manager)
+
+    app_global_put(MANAGER_KEY, proposed_manager)
+    app_global_put(PROPOSED_MANAGER_KEY, "")
+    log(ARC28Event("accept_manager(address)", proposed_manager))
     return
 end
 

@@ -64,6 +64,22 @@ set_reward_rate_event = Event(
 )
 
 
+propose_manager_event = Event(
+    name="propose_manager",
+    args=[
+        abi.Argument(arg_type="address", name="proposed_manager")
+    ]
+)
+
+
+accept_manager_event = Event(
+    name="accept_manager",
+    args=[
+        abi.Argument(arg_type="address", name="new_manager")
+    ]
+)
+
+
 apply_rate_change_event = Event(
     name="apply_rate_change",
     args=[
@@ -101,6 +117,8 @@ restaking_events = [
     init_event,
     state_event,
     set_reward_rate_event,
+    propose_manager_event,
+    accept_manager_event,
     apply_rate_change_event,
     user_state_event,
     update_user_state_event,
@@ -152,22 +170,6 @@ move_stake_event = Event(
         abi.Argument(arg_type="uint64", name="from_index"),
         abi.Argument(arg_type="uint64", name="to_index"),
         abi.Argument(arg_type="uint64", name="amount")
-    ]
-)
-
-
-propose_manager_event = Event(
-    name="propose_manager",
-    args=[
-        abi.Argument(arg_type="address", name="proposed_manager")
-    ]
-)
-
-
-accept_manager_event = Event(
-    name="accept_manager",
-    args=[
-        abi.Argument(arg_type="address", name="new_manager")
     ]
 )
 

@@ -1,3 +1,4 @@
+from algosdk.encoding import encode_address
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -13,12 +14,18 @@ class TAlgoStakingAppGlobalState:
     accumulated_rewards_per_unit: int
     total_staked_amount: int
     total_staker_count: int
+    tiny_power_threshold: int
     last_update_timestamp: int
 
+    proposed_manager: str = None
     manager: str = None
 
     @classmethod
     def from_globalstate(cls, global_state: dict):
+
+        proposed_manager = global_state.get(PROPOSED_MANAGER_KEY)
+        proposed_manager = encode_address(proposed_manager) if proposed_manager is not None else None
+
         return cls(
             total_reward_amount_sum=global_state.get(TOTAL_REWARD_AMOUNT_SUM_KEY, 0),
             total_claimed_reward_amount=global_state.get(TOTAL_CLAIMED_REWARD_AMOUNT_KEY, 0),
@@ -27,8 +34,10 @@ class TAlgoStakingAppGlobalState:
             accumulated_rewards_per_unit=global_state.get(ACCUMULATED_REWARDS_PER_UNIT, 0),
             total_staked_amount=global_state.get(TOTAL_STAKED_AMOUNT_KEY, 0),
             total_staker_count=global_state.get(TOTAL_STAKER_COUNT_KEY, 0),
+            tiny_power_threshold=global_state.get(TINY_POWER_THRESHOLD_KEY, 500_000_000),
             last_update_timestamp=global_state.get(LAST_UPDATE_TIMESTAMP_KEY, 0),
-            manager=global_state[MANAGER_KEY],
+            proposed_manager=proposed_manager,
+            manager=encode_address(global_state[MANAGER_KEY]),
         )
 
     def to_globalstate(self) -> dict:
