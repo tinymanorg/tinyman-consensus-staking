@@ -5,8 +5,6 @@ from .base_client import BaseClient
 
 class TAlgoClient(BaseClient):
 
-    keyreg_lsig = transaction.LogicSigAccount(b"\n\x81\x01C")
-
     def init(self):
         sp = self.get_suggested_params()
         transactions = [
@@ -109,7 +107,8 @@ class TAlgoClient(BaseClient):
 
     def go_online(self, node_index, vote_pk, selection_pk, state_proof_pk, vote_first, vote_last, vote_key_dilution, fee):
         account_address = encode_address(self.get_global(b"account_%i" % node_index))
-        self.add_key(account_address, self.keyreg_lsig)
+        # Use the user keys for signing transactions from the account_address
+        self.keys[account_address] = self.keys[self.user_address]
         sp = self.get_suggested_params()
         transactions = [
             transaction.PaymentTxn(
@@ -147,7 +146,8 @@ class TAlgoClient(BaseClient):
     
     def go_offline(self, node_index):
         account_address = encode_address(self.get_global(b"account_%i" % node_index))
-        self.add_key(account_address, self.keyreg_lsig)
+        # Use the user keys for signing transactions from the account_address
+        self.keys[account_address] = self.keys[self.user_address]
         sp = self.get_suggested_params()
         transactions = [
             transaction.ApplicationCallTxn(

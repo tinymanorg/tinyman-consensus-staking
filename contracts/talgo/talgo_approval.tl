@@ -20,11 +20,6 @@ const int RATE_SCALER = 1_000_000_000_000
 # A simple app that rekeys its account to the creator on creation. See auxapp_approval.tl
 const bytes AUX_PROGRAM = 0x0ab18101b2103100b2073100b2208100b201b3810143
 
-# This is a LogicSig that allows anything. It is used with change_online_status()
-# TEAL: "#pragma version 10\npushint 1\nreturn"
-# BYTES: "\n\x81\x01C"
-# KEY_REG_LOGIC_SIG_ADDRESS = U3ZXEUNFRSUDPPNFC6U7OBYO4S4AUOEP4RDBI23L2Q5TX3K5LTSVWQOKFM
-const bytes KEY_REG_LOGIC_SIG_ADDRESS = 0xa6f37251a58ca837bda517a9f7070ee4b80a388fe446146b6bd43b3bed5d5ce5
 
 router:
     create_application
@@ -308,10 +303,10 @@ func change_online_status(node_index: int):
     assert(user_address == app_global_get(concat("node_manager_", ascii_digit(node_index))))
     bytes account_address = app_global_get(concat("account_", ascii_digit(node_index)))
 
-    # The next txn in the group will be signed by the logicsig
-    # Ensure that it rekeys back to the application address
-    # Ensure that it is a Keyreg
-    # Allow any keyreg fields
+    # Ensure the next txn in the group is a Keyreg from account_address.
+    # It must be signed by the node_manger (Txn.Sender) because of the reykey below.
+    # Ensure that it rekeys back to the application address.
+    # Allow any keyreg fields.
     # The point of this is to allow keyreg fields in future that we do not know about at compile time.
     assert(Gtxn[+1].TypeEnum == Keyreg)
     assert(Gtxn[+1].Sender == account_address)
@@ -325,7 +320,7 @@ func change_online_status(node_index: int):
     inner_txn:
         Sender: account_address
         TypeEnum: Pay
-        RekeyTo: KEY_REG_LOGIC_SIG_ADDRESS
+        RekeyTo: Txn.Sender
         Fee: 0
     end
     log(ARC28Event("change_online_status(uint64)", itob(node_index)))
