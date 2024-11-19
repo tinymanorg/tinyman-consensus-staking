@@ -1,3 +1,4 @@
+from algosdk.encoding import encode_address
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -6,28 +7,51 @@ from sdk.constants import *
 
 @dataclass
 class TAlgoStakingAppGlobalState:
-    last_reward_rate_per_time: int
+    total_reward_amount_sum: int
+    total_claimed_reward_amount: int
     current_reward_rate_per_time: int
     current_reward_rate_per_time_end_timestamp: int
     accumulated_rewards_per_unit: int
     total_staked_amount: int
     total_staker_count: int
+    tiny_power_threshold: int
     last_update_timestamp: int
 
+    proposed_manager: str = None
     manager: str = None
 
     @classmethod
     def from_globalstate(cls, global_state: dict):
+
+        proposed_manager = global_state.get(PROPOSED_MANAGER_KEY)
+        proposed_manager = encode_address(proposed_manager) if proposed_manager is not None else None
+
         return cls(
-            last_reward_rate_per_time=global_state[LAST_REWARD_RATE_PER_TIME_KEY],
-            current_reward_rate_per_time=global_state[CURRENT_REWARD_RATE_PER_TIME_KEY],
-            current_reward_rate_per_time_end_timestamp=global_state[CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY],
-            accumulated_rewards_per_unit=global_state[ACCUMULATED_REWARDS_PER_UNIT],
-            total_staked_amount=global_state[TOTAL_STAKED_AMOUNT_KEY],
-            total_staker_count=global_state[TOTAL_STAKER_COUNT_KEY],
-            last_update_timestamp=global_state[LAST_UPDATE_TIMESTAMP_KEY],
-            manager=global_state[MANAGER_KEY],
+            total_reward_amount_sum=global_state.get(TOTAL_REWARD_AMOUNT_SUM_KEY, 0),
+            total_claimed_reward_amount=global_state.get(TOTAL_CLAIMED_REWARD_AMOUNT_KEY, 0),
+            current_reward_rate_per_time=global_state.get(CURRENT_REWARD_RATE_PER_TIME_KEY, 0),
+            current_reward_rate_per_time_end_timestamp=global_state.get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, 0),
+            accumulated_rewards_per_unit=global_state.get(ACCUMULATED_REWARDS_PER_UNIT, 0),
+            total_staked_amount=global_state.get(TOTAL_STAKED_AMOUNT_KEY, 0),
+            total_staker_count=global_state.get(TOTAL_STAKER_COUNT_KEY, 0),
+            tiny_power_threshold=global_state.get(TINY_POWER_THRESHOLD_KEY, 500_000_000),
+            last_update_timestamp=global_state.get(LAST_UPDATE_TIMESTAMP_KEY, 0),
+            proposed_manager=proposed_manager,
+            manager=encode_address(global_state[MANAGER_KEY]),
         )
+
+    def to_globalstate(self) -> dict:
+        return {
+            TOTAL_REWARD_AMOUNT_SUM_KEY: self.total_reward_amount_sum,
+            TOTAL_CLAIMED_REWARD_AMOUNT_KEY: self.total_claimed_reward_amount,
+            CURRENT_REWARD_RATE_PER_TIME_KEY: self.current_reward_rate_per_time,
+            CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: self.current_reward_rate_per_time_end_timestamp,
+            ACCUMULATED_REWARDS_PER_UNIT: self.accumulated_rewards_per_unit,
+            TOTAL_STAKED_AMOUNT_KEY: self.total_staked_amount,
+            TOTAL_STAKER_COUNT_KEY: self.total_staker_count,
+            LAST_UPDATE_TIMESTAMP_KEY: self.last_update_timestamp,
+            MANAGER_KEY: self.manager,
+        }
 
     def get_current_reward_rate_per_time(self, current_timestamp=None):
         if current_timestamp is None:
@@ -40,13 +64,39 @@ class TAlgoStakingAppGlobalState:
 
         return self.current_reward_rate_per_time
 
+    def calculate_accumulated_rewards_per_unit_delta(self, last_update_timestamp, current_timestamp, current_reward_rate_per_time):
+        if self.total_staked_amount:
+            time_delta = current_timestamp - last_update_timestamp
+            reward_rate_per_unit_per_time = (current_reward_rate_per_time * 1_000_000_000) // self.total_staked_amount
+            return (reward_rate_per_unit_per_time * time_delta)
+        return 0
+
     def get_accumulated_rewards_per_unit(self, current_timestamp=None):
         if current_timestamp is None:
             current_timestamp = int(datetime.now(tz=timezone.utc).timestamp())
-        
-        time_delta = current_timestamp - self.last_update_timestamp
-        reward_rate_per_unit_per_time = (self.get_current_reward_rate_per_time(current_timestamp) * 1_000_000_000) // self.total_staked_amount
-        return self.accumulated_rewards_per_unit + (reward_rate_per_unit_per_time * time_delta)
+
+        arpu_delta = 0
+        if current_timestamp > self.current_reward_rate_per_time_end_timestamp:
+            # If there is a rate expiration, split the calculation.
+
+            arpu_delta += self.calculate_accumulated_rewards_per_unit_delta(
+                last_update_timestamp=self.last_update_timestamp,
+                current_timestamp=self.current_reward_rate_per_time_end_timestamp,
+                current_reward_rate_per_time=self.get_current_reward_rate_per_time(self.current_reward_rate_per_time_end_timestamp)
+            )
+            arpu_delta += self.calculate_accumulated_rewards_per_unit_delta(
+                last_update_timestamp=self.current_reward_rate_per_time_end_timestamp,
+                current_timestamp=current_timestamp,
+                current_reward_rate_per_time=self.get_current_reward_rate_per_time(current_timestamp)
+            )
+        else:
+            arpu_delta += self.calculate_accumulated_rewards_per_unit_delta(
+                last_update_timestamp=self.last_update_timestamp,
+                current_timestamp=current_timestamp,
+                current_reward_rate_per_time=self.get_current_reward_rate_per_time(current_timestamp)
+            )
+
+        return self.accumulated_rewards_per_unit + arpu_delta
 
 
 def get_accumulated_rewards(user_state, global_state: TAlgoStakingAppGlobalState, current_timestamp=None):

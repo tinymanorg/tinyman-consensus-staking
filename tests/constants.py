@@ -5,14 +5,12 @@ from algojig import TealishProgram
 talgo_approval_program = TealishProgram('contracts/talgo/talgo.tl')
 talgo_clear_state_program = TealishProgram('contracts/talgo/clear_state.tl')
 
-# talgo_approval_program = TealishProgram('contracts/talgo/talgo.tl')
-# talgo_clear_state_program = TealishProgram('contracts/talgo/clear_state.tl')
-
 talgo_staking_approval_program = TealishProgram("contracts/talgo_staking/talgo_staking_approval.tl")
 talgo_staking_clear_state_program = TealishProgram("contracts/talgo_staking/talgo_staking_clear_state.tl")
 
-vault_approval_program = TealishProgram(tealish=requests.get("https://github.com/tinymanorg/tinyman-governance/blob/main/contracts/vault/vault_approval.tl?raw=True").text)
-vault_clear_state_program = TealishProgram(tealish=requests.get("https://github.com/tinymanorg/tinyman-governance/blob/main/contracts/vault/vault_clear_state.tl?raw=True").text)
+# Added for test dependency.
+vault_approval_program = TealishProgram("tests/vault/vault_approval.tl")
+vault_clear_state_program = TealishProgram("tests/vault/vault_clear_state.tl")
 
 APP_LOCAL_INTS = 0
 APP_LOCAL_BYTES = 0

@@ -6,10 +6,12 @@ from algosdk.logic import get_application_address
 from algojig import get_suggested_params
 from algojig.ledger import JigLedger
 
-from tinyman.utils import int_to_bytes
+from tinyman.utils import int_to_bytes, get_global_state
+from tinyman.governance.vault.constants import MAX_LOCK_TIME
 
 from sdk.constants import *
 from sdk.talgo_staking_client import TAlgoStakingClient, UserState
+from sdk.utils import TAlgoStakingAppGlobalState
 
 from tests.constants import *
 from tests.utils import JigAlgod
@@ -41,14 +43,14 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
         self.ledger.set_account_balance(self.tiny_asset_creator_address, 10_000_000)
 
         # Set up Vault
-        self.tiny_asset_id = 12345
+        self.tiny_asset_id = 1003
         self.ledger.create_asset(self.tiny_asset_id, dict(total=10**15, decimals=6, name="Tinyman", unit_name="TINY", creator=self.tiny_asset_creator_address))
         self.ledger.create_app(app_id=self.vault_app_id, approval_program=vault_approval_program, creator=self.app_creator_address, local_ints=0, local_bytes=0, global_ints=4, global_bytes=0)
         self.ledger.set_global_state(self.vault_app_id, {"tiny_asset_id": self.tiny_asset_id, "total_locked_amount": 0, "total_power_count": 0, "last_total_power_timestamp": 0})
         self.ledger.set_account_balance(get_application_address(self.vault_app_id), 300_000)
         self.ledger.boxes[self.vault_app_id] = {}
 
-        self.talgo_asset_id = 78910
+        self.talgo_asset_id = 1004
         self.ledger.create_asset(self.talgo_asset_id, 
             {
                 "creator": self.tiny_asset_creator_address,
@@ -67,7 +69,7 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
 
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
         self.application_address = get_application_address(self.app_id)
-        self.stalgo_asset_id = 1112131
+        self.stalgo_asset_id = 1005
 
         self.algod = JigAlgod(self.ledger)
         self.talgo_staking_client = TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, self.user_address, self.user_sk)
@@ -90,10 +92,10 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
                 TINY_ASSET_ID_KEY: self.tiny_asset_id,
                 VAULT_APP_ID_KEY: self.vault_app_id,
                 MANAGER_KEY: decode_address(self.manager_address),
-                TINY_POWER_THRESHOLD_KEY: 1000,
+                TINY_POWER_THRESHOLD_KEY: 500_000_000,
+                TOTAL_CLAIMED_REWARD_AMOUNT_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_KEY: 0,
                 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY: MAX_UINT64,
-                LAST_REWARD_RATE_PER_TIME_KEY: 0
             }
         )
 
@@ -124,24 +126,63 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
         )
         self.ledger.global_states[self.app_id][STALGO_ASSET_ID_KEY] = self.stalgo_asset_id
 
+    def imitate_update_state(self, timestamp=None):
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        if timestamp is None:
+            timestamp = now
+
+        global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+        assert(global_state.last_update_timestamp < timestamp)
+
+        self.ledger.update_global_state(
+            self.app_id,
+            {
+                ACCUMULATED_REWARDS_PER_UNIT: global_state.get_accumulated_rewards_per_unit(timestamp),
+                LAST_UPDATE_TIMESTAMP_KEY: timestamp
+            }
+        )
+
     def set_reward_rate(self, total_reward_amount=10_000_000, start_timestamp=None, end_timestamp=None):
         if not (start_timestamp and end_timestamp):
             start_timestamp = start_timestamp or int(datetime.now(tz=timezone.utc).timestamp())
             end_timestamp = start_timestamp + WEEK
 
+        self.imitate_update_state(start_timestamp)
         duration = int(end_timestamp - start_timestamp)
         reward_rate_per_time = int(total_reward_amount / duration)
 
-        self.ledger.global_states[self.app_id][LAST_REWARD_RATE_PER_TIME_KEY] = self.ledger.global_states[self.app_id].get(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+        total_reward_amount_sum = self.ledger.global_states[self.app_id].get(TOTAL_REWARD_AMOUNT_SUM_KEY, 0)
+        total_claimed_reward_amount = self.ledger.global_states[self.app_id].get(TOTAL_CLAIMED_REWARD_AMOUNT_KEY, 0)
+        current_reward_rate_per_time_end_timestamp = self.ledger.global_states[self.app_id].get(CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY, MAX_UINT64)
+
+        if start_timestamp < current_reward_rate_per_time_end_timestamp:
+            current_reward_rate_per_time = self.ledger.global_states[self.app_id].get(CURRENT_REWARD_RATE_PER_TIME_KEY, 0)
+            remaining_from_current_rate = current_reward_rate_per_time * (current_reward_rate_per_time_end_timestamp - start_timestamp)
+
+            total_reward_amount_sum -= remaining_from_current_rate
+
+        total_reward_amount_sum += total_reward_amount
+        balance_needed = total_reward_amount_sum - total_claimed_reward_amount
+
+        self.ledger.global_states[self.app_id][TOTAL_REWARD_AMOUNT_SUM_KEY] = total_reward_amount_sum
         self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_KEY] = reward_rate_per_time
         self.ledger.global_states[self.app_id][CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY] = end_timestamp
-        self.ledger.set_account_balance(self.application_address, total_reward_amount, self.tiny_asset_id)
+        self.ledger.set_account_balance(self.application_address, balance_needed + 1, self.tiny_asset_id)
 
-    def simulate_user_voting_power(self, account_address=None, locked_amount=1000, lock_end_time=None):
+        return reward_rate_per_time, end_timestamp
+
+    def simulate_user_voting_power(self, account_address=None, locked_amount=510_000_000, lock_start_time = None, lock_end_time=None):
+        """
+        For MAX_LOCK_TIME, locked_amount is equivalent to voting power. Added +10_000_000 microunits for rounding errors and keeping the power enough over a time span.
+        """
+
         now = int(datetime.now(tz=timezone.utc).timestamp())
 
+        lock_start_time = lock_start_time or now
+        lock_end_time = lock_end_time or (lock_start_time + MAX_LOCK_TIME)
+        assert(lock_start_time < lock_end_time)
+
         account_address = account_address or self.user_address
-        lock_end_time = lock_end_time or (now + 125798400)
         account_state = int_to_bytes(locked_amount) + int_to_bytes(lock_end_time) + int_to_bytes(1) + int_to_bytes(0)
 
         self.ledger.set_box(self.vault_app_id, key=decode_address(account_address), value=account_state)
@@ -149,8 +190,12 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
     def simulate_user_stake(self, account_address=None, staked_amount=100_000, timestamp=None):
         now = int(datetime.now(tz=timezone.utc).timestamp())
 
+        current_global_state = TAlgoStakingAppGlobalState.from_globalstate(self.ledger.global_states[self.app_id])
+
         account_address = account_address or self.user_address
         timestamp = timestamp or now
+
+        assert timestamp >= current_global_state.last_update_timestamp
 
         user_state = UserState()
         user_state.staked_amount = staked_amount
@@ -169,3 +214,16 @@ class TalgoStakingBaseTestCase(unittest.TestCase):
 
         last_update_timestamp = self.ledger.global_states[self.app_id].get(b"last_update_timestamp", 0)
         self.ledger.global_states[self.app_id][b"last_update_timestamp"] = timestamp if timestamp > last_update_timestamp else last_update_timestamp
+
+    def get_new_talgo_staking_client(self, user_sk, user_address):
+        return TAlgoStakingClient(self.algod, self.app_id, self.vault_app_id, self.tiny_asset_id, self.talgo_asset_id, self.stalgo_asset_id, user_address, user_sk)
+
+    def get_new_user(self):
+        user_sk, user_address = generate_account()
+        self.ledger.set_account_balance(user_address, 100_000_000)
+
+        return user_sk, user_address
+
+    def get_new_user_client(self):
+        user_sk, user_address = self.get_new_user()
+        return self.get_new_talgo_staking_client(user_sk, user_address)

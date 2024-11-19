@@ -27,7 +27,7 @@ create_application_event = Event(
 
 
 init_event = Event(
-    name="event",
+    name="init",
     args=[
         abi.Argument(arg_type="uint64", name="stalgo_asset_id")
     ]
@@ -41,14 +41,6 @@ state_event = Event(
         abi.Argument(arg_type="uint64", name="current_reward_rate_per_time"),
         abi.Argument(arg_type="uint64", name="accumulated_rewards_per_unit"),
         abi.Argument(arg_type="uint64", name="total_staked_amount"),
-    ]
-)
-
-
-update_state_event = Event(
-    name="update_state",
-    args=[
-        abi.Argument(arg_type="uint64", name="timestamp"),
     ]
 )
 
@@ -68,6 +60,22 @@ set_reward_rate_event = Event(
         abi.Argument(arg_type="uint64", name="start_timestamp"),
         abi.Argument(arg_type="uint64", name="end_timestamp"),
         abi.Argument(arg_type="uint64", name="current_reward_rate_per_time"),
+    ]
+)
+
+
+propose_manager_event = Event(
+    name="propose_manager",
+    args=[
+        abi.Argument(arg_type="address", name="proposed_manager")
+    ]
+)
+
+
+accept_manager_event = Event(
+    name="accept_manager",
+    args=[
+        abi.Argument(arg_type="address", name="new_manager")
     ]
 )
 
@@ -97,7 +105,7 @@ decrease_stake_event = Event(
 
 
 claim_rewards_event = Event(
-    name="increase_stake",
+    name="claim_rewards",
     args=[
         abi.Argument(arg_type="uint64", name="amount"),
     ]
@@ -109,8 +117,9 @@ restaking_events = [
     init_event,
     state_event,
     set_reward_rate_event,
+    propose_manager_event,
+    accept_manager_event,
     apply_rate_change_event,
-    update_state_event,
     user_state_event,
     update_user_state_event,
     increase_stake_event,
@@ -147,8 +156,85 @@ burn_event = Event(
 )
 
 
+claim_protocol_rewards_event = Event(
+    name="claim_protocol_rewards",
+    args=[
+        abi.Argument(arg_type="uint64", name="amount")
+    ]
+)
+
+
+move_stake_event = Event(
+    name="move_stake",
+    args=[
+        abi.Argument(arg_type="uint64", name="from_index"),
+        abi.Argument(arg_type="uint64", name="to_index"),
+        abi.Argument(arg_type="uint64", name="amount")
+    ]
+)
+
+
+set_node_manager_event = Event(
+    name="set_node_manager",
+    args=[
+        abi.Argument(arg_type="uint64", name="node_index"),
+        abi.Argument(arg_type="address", name="new_node_manager")
+    ]
+)
+
+
+set_stake_manager_event = Event(
+    name="set_stake_manager",
+    args=[
+        abi.Argument(arg_type="address", name="new_stake_manager")
+    ]
+)
+
+
+set_fee_collector_event = Event(
+    name="set_fee_collector",
+    args=[
+        abi.Argument(arg_type="address", name="new_fee_collector")
+    ]
+)
+
+
+set_protocol_fee_event = Event(
+    name="set_protocol_fee",
+    args=[
+        abi.Argument(arg_type="uint64", name="fee_rate")
+    ]
+)
+
+
+set_max_account_balance_event = Event(
+    name="set_max_account_balance",
+    args=[
+        abi.Argument(arg_type="uint64", name="max_amount")
+    ]
+)
+
+
+change_online_status_event = Event(
+    name="change_online_status",
+    args=[
+        abi.Argument(arg_type="uint64", name="node_index")
+    ]
+)
+
+
 talgo_events = [
     rate_update_event,
     mint_event,
     burn_event,
+    claim_protocol_rewards_event,
+    move_stake_event,
+    propose_manager_event,
+    accept_manager_event,
+    set_node_manager_event,
+    set_stake_manager_event,
+    set_fee_collector_event,
+    set_protocol_fee_event,
+    set_max_account_balance_event,
+    change_online_status_event,
 ]

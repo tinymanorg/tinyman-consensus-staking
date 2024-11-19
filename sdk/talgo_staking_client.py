@@ -41,6 +41,52 @@ class TAlgoStakingClient(BaseClient):
                 sp=sp,
                 index=self.app_id,
                 app_args=["set_reward_rate", total_reward_amount, end_timestamp],
+                foreign_assets=[self.tiny_asset_id]
+            )
+        ]
+
+        return self._submit(transactions)
+
+    def propose_manager(self, new_manager_address):
+        sp = self.get_suggested_params()
+
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["propose_manager", decode_address(new_manager_address)],
+            )
+        ]
+
+        return self._submit(transactions)
+
+    def accept_manager(self):
+        sp = self.get_suggested_params()
+
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["accept_manager"],
+            )
+        ]
+
+        return self._submit(transactions)
+
+    def set_tiny_power_threshold(self, threshold: int):
+        sp = self.get_suggested_params()
+
+        transactions = [
+            transaction.ApplicationCallTxn(
+                sender=self.user_address,
+                on_complete=transaction.OnComplete.NoOpOC,
+                sp=sp,
+                index=self.app_id,
+                app_args=["set_tiny_power_threshold", threshold],
             )
         ]
 
@@ -132,7 +178,7 @@ class TAlgoStakingClient(BaseClient):
             )
         ]
 
-        return self._submit(transactions, additional_fees=1)
+        return self._submit(transactions, additional_fees=2)
     
     def decrease_stake(self, amount: int):
         sp = self.get_suggested_params()
@@ -168,11 +214,13 @@ class TAlgoStakingClient(BaseClient):
                 sp=sp,
                 index=self.app_id,
                 app_args=["claim_rewards"],
+                foreign_apps=[self.vault_app_id],
                 foreign_assets=[self.tiny_asset_id],
                 boxes=[
                     (0, user_state_box_name),
+                    (self.vault_app_id, user_state_box_name),
                 ],
             )
         ]
 
-        return self._submit(transactions, additional_fees=2)
+        return self._submit(transactions, additional_fees=3)
