@@ -1,4 +1,8 @@
 #pragma version 10
-#tealish version git+https://github.com/tinymanorg/tealish.git@e8d1b27620220bc4e520d7d3b6d62523e13a7723
+#tealish version git+https://github.com/Hipo/tealish.git@f1c2b72aaeb586ed082c380a638ed2e7ca47bcae
+
+# Tinyman tAlgo
+# License: https://github.com/tinymanorg/tinyman-consensus-staking/blob/main/LICENSE
+# Documentation: https://docs.tinyman.org
 
 exit(1)

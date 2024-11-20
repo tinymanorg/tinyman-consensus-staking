@@ -1,25 +1,30 @@
 #pragma version 10
+//tealish version git+https://github.com/Hipo/tealish.git@f1c2b72aaeb586ed082c380a638ed2e7ca47bcae
+
+// Tinyman tAlgo
+// License: https://github.com/tinymanorg/tinyman-consensus-staking/blob/main/LICENSE
+// Documentation: https://docs.tinyman.org
 
 // This app executes once and is deleted upon completion.
 // Its only purpose is to rekey the application account to the creator.
 
-// tl:6: inner_txn:
+// tl:11: inner_txn:
 itxn_begin
-    // tl:7: TypeEnum: Pay
+    // tl:12: TypeEnum: Pay
     pushint 1                                               // Pay
     itxn_field TypeEnum
-    // tl:8: Receiver: Txn.Sender
+    // tl:13: Receiver: Txn.Sender
     txn Sender
     itxn_field Receiver
-    // tl:9: RekeyTo: Txn.Sender
+    // tl:14: RekeyTo: Txn.Sender
     txn Sender
     itxn_field RekeyTo
-    // tl:10: Fee: 0
+    // tl:15: Fee: 0
     pushint 0
     itxn_field Fee
 itxn_submit
 // end inner_txn
-// tl:12: exit(1)
+// tl:17: exit(1)
 pushint 1
 return
 

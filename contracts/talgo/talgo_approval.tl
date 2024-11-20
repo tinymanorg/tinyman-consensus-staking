@@ -1,4 +1,9 @@
 #pragma version 10
+#tealish version git+https://github.com/Hipo/tealish.git@f1c2b72aaeb586ed082c380a638ed2e7ca47bcae
+
+# Tinyman tAlgo
+# License: https://github.com/tinymanorg/tinyman-consensus-staking/blob/main/LICENSE
+# Documentation: https://docs.tinyman.org
 
 # This is a singleton app.
 # This app manages up to 5 accounts that can be brought online to participate in consensus.
@@ -23,7 +28,6 @@ const bytes AUX_PROGRAM = 0x0ab18101b2103100b2073100b2208100b201b3810143
 
 router:
     create_application
-    update_application
     init
     mint
     burn
@@ -80,14 +84,6 @@ func create_application():
 end
 
 
-# TODO: This must be removed before Mainnet.
-@public(OnCompletion=UpdateApplication)
-func update_application():
-    assert(Txn.Sender == Global.CreatorAddress)
-    return
-end
-
-
 # permission: anyone
 @public()
 func init():
@@ -102,7 +98,7 @@ func init():
         TypeEnum: Acfg
         Sender: Global.CurrentApplicationAddress
         ConfigAssetUnitName: "TALGO"
-        ConfigAssetName: "TALGO"
+        ConfigAssetName: "tALGO"
         ConfigAssetTotal: TALGO_TOTAL_SUPPLY
         ConfigAssetDecimals: 6
         ConfigAssetURL: "https://tinyman.org"

@@ -1,4 +1,9 @@
 #pragma version 10
+#tealish version git+https://github.com/Hipo/tealish.git@f1c2b72aaeb586ed082c380a638ed2e7ca47bcae
+
+# Tinyman tAlgo
+# License: https://github.com/tinymanorg/tinyman-consensus-staking/blob/main/LICENSE
+# Documentation: https://docs.tinyman.org
 
 
 # Name: <user_address>
@@ -39,7 +44,6 @@ const int ALGO_TOTAL_SUPPLY = 10000000000000000
 
 router:
     create_application
-    update_application
     init
     propose_manager
     accept_manager
@@ -50,15 +54,6 @@ router:
     increase_stake
     decrease_stake
     claim_rewards
-end
-
-
-# TODO: This should be removed.
-@public(OnCompletion=UpdateApplication)
-func update_application():
-	bytes manager_address = app_global_get(MANAGER_KEY)
-	assert(Txn.Sender == manager_address)
-    return
 end
 
 
