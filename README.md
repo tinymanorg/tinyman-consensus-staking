@@ -5,7 +5,7 @@ This repo contains the contracts that form the Tinyman Liquid Staking system.
 ### Docs
 
 The liquid staking system is described in detail in the following document:
-[Tinyman Governance Specification](docs/Tinyman_Liquid_Staking_Protocol_Specification.pdf)
+[Tinyman Liquid Staking Specification](docs/Tinyman_Liquid_Staking_Protocol_Specification.pdf)
 
 User docs for Tinyman Liquid Staking can be found at [docs.tinyman.org](https://docs.tinyman.org).
 
@@ -31,10 +31,10 @@ Reports of potential flaws must be responsibly disclosed to security@tinyman.org
 Note: Mac OS & Linux Only
 
 ```
-% python3 -m venv ~/envs/gov
-% source ~/envs/gov/bin/activate
-(gov) % pip install -r requirements.txt
-(gov) % python -m algojig.check
+% python3 -m venv ~/envs/talgo
+% source ~/envs/talgo/bin/activate
+(talgo) % pip install -r requirements.txt
+(talgo) % python -m algojig.check
 ```
 
 We recommend using VS Code with this Tealish extension when reviewing contracts written in Tealish: https://github.com/thencc/TealishVSCLangServer/blob/main/tealish-language-server-1.0.0.vsix
@@ -44,10 +44,10 @@ We recommend using VS Code with this Tealish extension when reviewing contracts 
 
 ```
 # Run all tests (this can take a while)
-(gov) % python -m unittest -v
+(talgo) % python -m unittest -v
 
 # Run a specific test
-(gov) % python -m unittest -vk "tests.tests_talgo.TestSetup.test_create_app"
+(talgo) % python -m unittest -vk "tests.tests_talgo.TestSetup.test_create_app"
 ```
 
 Note: The tests read the `.tl` Tealish source files from the contracts directories, not the `.teal` build files.
@@ -57,8 +57,8 @@ Note: The tests read the `.tl` Tealish source files from the contracts directori
 
 ```
 # Compile each set of contracts to generate the `.teal` files in the `build` subdirectories:
-(gov) % tealish compile contracts/talgo
-(gov) % tealish compile contracts/talgo_staking
+(talgo) % tealish compile contracts/talgo
+(talgo) % tealish compile contracts/talgo_staking
 ```
 
 ### Licensing
