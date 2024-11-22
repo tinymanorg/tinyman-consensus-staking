@@ -26,7 +26,7 @@ class TAlgoStakingTests(TalgoStakingBaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.ledger.set_account_balance(self.user_address, int(1e16))
+        self.ledger.set_account_balance(self.user_address, int(1e14))
 
     def dummy_block(self, timestamp=None):
         if timestamp is None:
@@ -275,7 +275,7 @@ class ManagerMethodsTests(TalgoStakingBaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.ledger.set_account_balance(self.user_address, int(1e16))
+        self.ledger.set_account_balance(self.user_address, int(1e14))
 
     def test_set_reward_rate_initial(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -625,7 +625,7 @@ class UpdateStateTests(TalgoStakingBaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.ledger.set_account_balance(self.user_address, int(1e16))
+        self.ledger.set_account_balance(self.user_address, int(1e14))
 
     def test_update_state_without_staked_amount(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -881,7 +881,7 @@ class IncreaseStakeTests(TalgoStakingBaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.ledger.set_account_balance(self.user_address, int(1e16))
+        self.ledger.set_account_balance(self.user_address, int(1e14))
 
     def test_increase_stake_without_power(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -1088,7 +1088,7 @@ class DecreaseStakeTests(TalgoStakingBaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.ledger.set_account_balance(self.user_address, int(1e16))
+        self.ledger.set_account_balance(self.user_address, int(1e14))
     
     def test_decrease_stake_without_stake(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
@@ -1329,7 +1329,7 @@ class ClaimRewardsTests(TalgoStakingBaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.ledger.set_account_balance(self.user_address, int(1e16))
+        self.ledger.set_account_balance(self.user_address, int(1e14))
     
     def test_claim_rewards_without_power(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)

@@ -59,7 +59,7 @@ class TestSetup(unittest.TestCase):
         self.create_talgo_app(self.app_id, self.app_creator_address)
 
         self.t_algo_client = TAlgoClient(JigAlgod(self.ledger), self.app_id, self.user_address, self.user_sk)
-        self.ledger.set_account_balance(self.user_address, int(1e16))
+        self.ledger.set_account_balance(self.user_address, int(1e14))
 
     def create_talgo_app(self, app_id, app_creator_address):
         self.ledger.create_app(
