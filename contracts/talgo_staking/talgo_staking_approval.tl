@@ -22,7 +22,6 @@ const bytes TINY_ASSET_ID_KEY = "tiny_asset_id"
 const bytes TALGO_ASSET_ID_KEY = "talgo_asset_id"
 const bytes STALGO_ASSET_ID_KEY = "stalgo_asset_id"
 
-const int MAX_RATE_INCREMENT_PERCENTAGE = 10
 const bytes TOTAL_REWARD_AMOUNT_SUM_KEY = "total_reward_amount_sum"
 const bytes TOTAL_CLAIMED_REWARD_AMOUNT_KEY = "total_claimed_reward_amount"
 const bytes CURRENT_REWARD_RATE_PER_TIME_KEY = "current_reward_rate_per_time"
