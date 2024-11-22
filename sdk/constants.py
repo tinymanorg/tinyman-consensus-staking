@@ -15,7 +15,6 @@ TOTAL_REWARD_AMOUNT_SUM_KEY = b"total_reward_amount_sum"
 TOTAL_CLAIMED_REWARD_AMOUNT_KEY = b"total_claimed_reward_amount"
 CURRENT_REWARD_RATE_PER_TIME_KEY = b"current_reward_rate_per_time"
 CURRENT_REWARD_RATE_PER_TIME_END_TIMESTAMP_KEY = b"current_reward_rate_per_time_end_timestamp"
-MAX_RATE_INCREMENT_PERCENTAGE = 10
 
 TINY_POWER_THRESHOLD_KEY = b"tiny_power_threshold"
 LAST_UPDATE_TIMESTAMP_KEY = b"last_update_timestamp"
