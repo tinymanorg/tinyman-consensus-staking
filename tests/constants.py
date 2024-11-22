@@ -2,8 +2,8 @@ import requests
 from datetime import datetime, timezone
 from algojig import TealishProgram
 
-talgo_approval_program = TealishProgram('contracts/talgo/talgo.tl')
-talgo_clear_state_program = TealishProgram('contracts/talgo/clear_state.tl')
+talgo_approval_program = TealishProgram('contracts/talgo/talgo_approval.tl')
+talgo_clear_state_program = TealishProgram('contracts/talgo/talgo_clear_state.tl')
 
 talgo_staking_approval_program = TealishProgram("contracts/talgo_staking/talgo_staking_approval.tl")
 talgo_staking_clear_state_program = TealishProgram("contracts/talgo_staking/talgo_staking_clear_state.tl")
