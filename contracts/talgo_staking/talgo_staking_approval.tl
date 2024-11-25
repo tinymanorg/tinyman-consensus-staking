@@ -313,6 +313,8 @@ func increase_stake(amount: int):
 
     box<UserState> user_state = OpenOrCreateBox(Txn.Sender)
 
+    assert(amount > 0)
+
     update_state_internal(Global.LatestTimestamp)
     update_user_state(Txn.Sender)
 

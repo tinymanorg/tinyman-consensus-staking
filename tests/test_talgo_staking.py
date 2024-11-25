@@ -894,12 +894,28 @@ class IncreaseStakeTests(TalgoStakingBaseTestCase):
         self.simulate_user_voting_power(locked_amount=499_000_000)
 
         # Increase Stake
-        self.ledger.next_timestamp = now + 1
         self.ledger.next_timestamp = now + DAY
         self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
         with self.assertRaises(LogicEvalError) as e:
             self.talgo_staking_client.increase_stake(100_000)
         self.assertEqual(e.exception.source['line'], 'assert(current_tiny_power >= app_global_get(TINY_POWER_THRESHOLD_KEY))')
+
+    def test_increase_stake_with_0_amount(self):
+        self.create_talgo_staking_app(self.app_id, self.app_creator_address)
+        self.ledger.set_account_balance(self.application_address, 10_000_000)
+        self.init_talgo_staking_app()
+
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        reward_rate_per_time, _ = self.set_reward_rate(start_timestamp=now, end_timestamp=now + 2 * WEEK)
+
+        self.simulate_user_voting_power(locked_amount=499_000_000)
+
+        # Increase Stake
+        self.ledger.next_timestamp = now + DAY
+        self.ledger.set_account_balance(self.user_address, 100_000, self.talgo_asset_id)
+        with self.assertRaises(LogicEvalError) as e:
+            self.talgo_staking_client.increase_stake(0)
+        self.assertEqual(e.exception.source['line'], 'assert(amount > 0)')
 
     def test_first_increase_stake(self):
         self.create_talgo_staking_app(self.app_id, self.app_creator_address)
